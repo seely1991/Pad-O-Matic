@@ -33,6 +33,7 @@ volatile int bufferWriteIndex = 0;
 
 // Threshold Detection
 const float signalThreshold = 0.02;
+const int silentDuration = 500;
 elapsedMillis silenceTimer;
 bool silent = false;
 
@@ -118,6 +119,7 @@ void loop() {
     static bool lastFootswitchState = HIGH;
     // capture current reading of footswitch pin
     bool currentFootswitchState = digitalRead(footswitchPin);
+    // If first time detecting footswitch is pressed, set state to wait for signal
     if (lastFootswitchState == HIGH && currentFootswitchState == LOW) {
         if (!recordingActive && !loopingActive) {
             Serial.println("Footswitch Pressed: Waiting for signal...");
@@ -126,6 +128,7 @@ void loop() {
             recordTimer = 0;
         }
     }
+    // capture current footswitch state to compare with next state
     lastFootswitchState = currentFootswitchState;
 
     // Audio Processing
@@ -171,14 +174,14 @@ void loop() {
     }
 
     // Layering timing
-    if (recordingActive && recordTimer > 3000) {
-        Serial.println("3 Seconds Layer Complete");
+    if (recordingActive && recordTimer > RECORD_SECONDS * 1000) {
+        Serial.println("Layer Complete");
         recordingActive = true; // Continue layering
         recordTimer = 0;
     }
 
     // Silence detection to freeze
-    if (recordingActive && silenceTimer > 1000) {
+    if (recordingActive && silenceTimer > silentDuration) {
         Serial.println("Silence Detected: Freezing Loop");
         recordingActive = false;
         loopingActive = true;
