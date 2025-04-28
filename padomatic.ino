@@ -15,6 +15,7 @@ AudioConnection          patchCord3(audioInput, 1, audioOutput, 1); // Right cha
 
 // ==================== CONSTANTS ======================
 const int footswitchPin = 0;
+const unsigned long debounceDelay = 25; // milliseconds
 const float signalThreshold = 0.02;
 const int silentDuration = 500;
 const uint32_t swellDuration = 1500;
@@ -34,10 +35,15 @@ static uint32_t playbackIndex = 0;
 elapsedMillis silenceTimer;
 elapsedMillis recordTimer;
 
+// Debounce variables
+bool lastFootswitchReading = HIGH;
+bool debouncedFootswitchState = HIGH;
+unsigned long lastDebounceTime = 0;
+
 //////////////////////////////////////////////////////////////////////////////////////
 // startSwell()
 //
-// Description: 
+// Description:
 //   Initiates the swell by setting the swell start time to current time
 //   and the swelling flag to true.
 //
@@ -59,10 +65,6 @@ void startSwell() {
 //   in relation to the time the swell started.
 //
 // Parameters: None
-//
-// Global Variables:
-//   - swellStartTime: time (millis) the swell started
-//   - swellDuration: time (millis) until the swell should reach full volume (1)
 //
 // Returns:
 //   float representing the gain between 0 and 1 which lies on a logarithmic curve in
@@ -102,28 +104,35 @@ void setup() {
 //
 // Parameters: None
 //
-// Global Variables: 
-//   - All major state flags and timing variables
-//
 // Returns: Void
 //
 //////////////////////////////////////////////////////////////////////////////////////
 void loop() {
-    // Initialize the lastFootswitchState as static var (HIGH)
-    static bool lastFootswitchState = HIGH;
-    // Capture current reading of footswitch pin
-    bool currentFootswitchState = digitalRead(footswitchPin);
+    // =================== FOOTSWITCH HANDLING (with debounce) ===================
+    bool currentFootswitchReading = digitalRead(footswitchPin);
 
-    // If footswitch pressed, set state to wait for signal
-    if (lastFootswitchState == HIGH && currentFootswitchState == LOW) {
-        if (!recordingActive && !loopingActive) {
-            Serial.println("Footswitch Pressed: Waiting for signal...");
-            waitingForSignal = true;
-            bufferWriteIndex = 0;
-            recordTimer = 0;
+    if (currentFootswitchReading != lastFootswitchReading) {
+        lastDebounceTime = millis(); // reset the debouncing timer
+    }
+
+    if ((millis() - lastDebounceTime) > debounceDelay) {
+        // if the button state has changed:
+        if (currentFootswitchReading != debouncedFootswitchState) {
+            debouncedFootswitchState = currentFootswitchReading;
+
+            // only on HIGH -> LOW transition (button pressed)
+            if (debouncedFootswitchState == LOW) {
+                if (!recordingActive && !loopingActive) {
+                    Serial.println("Footswitch Pressed: Waiting for signal...");
+                    waitingForSignal = true;
+                    bufferWriteIndex = 0;
+                    recordTimer = 0;
+                }
+            }
         }
     }
-    lastFootswitchState = currentFootswitchState;
+
+    lastFootswitchReading = currentFootswitchReading;
 
     // =================== AUDIO PROCESSING ===================
     if (audioQueue.available() > 0) {
