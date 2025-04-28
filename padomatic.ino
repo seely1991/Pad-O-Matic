@@ -4,47 +4,42 @@
 #include <SPI.h>
 #include <SD.h>
 
-// Audio Setup
+// ==================== AUDIO SETUP ====================
 AudioInputI2S            audioInput;
 AudioOutputI2S           audioOutput;
 AudioRecordQueue         audioQueue;
+AudioPlayQueue           playQueue;
 AudioConnection          patchCord1(audioInput, 0, audioQueue);
-AudioConnection          patchCord2(audioInput, 0, audioOutput, 0);
-AudioConnection          patchCord3(audioInput, 1, audioOutput, 1);
+AudioConnection          patchCord2(playQueue, 0, audioOutput, 0);
+AudioConnection          patchCord3(audioInput, 1, audioOutput, 1); // Right channel passthrough
 
-// Footswitch State Constants
+// ==================== CONSTANTS ======================
 const int footswitchPin = 0;
-bool footswitchPressed = false;
+const float signalThreshold = 0.02;
+const int silentDuration = 500;
+const uint32_t swellDuration = 1500;
+const int SAMPLE_RATE = 44100;
+const int RECORD_SECONDS = 3;
+const int BUFFER_SIZE = SAMPLE_RATE * RECORD_SECONDS;
+
+// ==================== STATE VARIABLES =================
 bool waitingForSignal = false;
 bool swelling = false;
 bool recordingActive = false;
 bool loopingActive = false;
-
-// Auto-swell variables
 uint32_t swellStartTime = 0;
-uint32_t swellDuration = 1500;
-
-// Buffer for 3-second recording
-const int SAMPLE_RATE = 44100;
-const int RECORD_SECONDS = 3;
-const int BUFFER_SIZE = SAMPLE_RATE * RECORD_SECONDS;
 int16_t loopBuffer[BUFFER_SIZE];
 volatile int bufferWriteIndex = 0;
-
-// Threshold Detection
-const float signalThreshold = 0.02;
-const int silentDuration = 500;
+static uint32_t playbackIndex = 0;
 elapsedMillis silenceTimer;
-bool silent = false;
-
-// Timer
 elapsedMillis recordTimer;
 
 //////////////////////////////////////////////////////////////////////////////////////
 // startSwell()
 //
-// Description: initiates the swell by setting the swell start time to current time
-//   and the swelling flag to true
+// Description: 
+//   Initiates the swell by setting the swell start time to current time
+//   and the swelling flag to true.
 //
 // Parameters: None
 //
@@ -65,10 +60,10 @@ void startSwell() {
 //
 // Parameters: None
 //
-// Global Variabls:
+// Global Variables:
 //   - swellStartTime: time (millis) the swell started
 //   - swellDuration: time (millis) until the swell should reach full volume (1)
-// 
+//
 // Returns:
 //   float representing the gain between 0 and 1 which lies on a logarithmic curve in
 //   relation to the time elapsed from when the swell began.
@@ -102,24 +97,24 @@ void setup() {
 // loop()
 //
 // Description:
-//   Main entry point of the program, loops continously and performs all functionality
+//   Main entry point of the program, loops continuously and performs all functionality
 //   of the program.
 //
-// Parameters:
-//   - None
+// Parameters: None
 //
-// Global Variables:
+// Global Variables: 
+//   - All major state flags and timing variables
 //
-// 
-// Reurns:
-//   Void
+// Returns: Void
+//
 //////////////////////////////////////////////////////////////////////////////////////
 void loop() {
-    // initialize the lastFootswitchState as static var (HIGH)
+    // Initialize the lastFootswitchState as static var (HIGH)
     static bool lastFootswitchState = HIGH;
-    // capture current reading of footswitch pin
+    // Capture current reading of footswitch pin
     bool currentFootswitchState = digitalRead(footswitchPin);
-    // If first time detecting footswitch is pressed, set state to wait for signal
+
+    // If footswitch pressed, set state to wait for signal
     if (lastFootswitchState == HIGH && currentFootswitchState == LOW) {
         if (!recordingActive && !loopingActive) {
             Serial.println("Footswitch Pressed: Waiting for signal...");
@@ -128,10 +123,9 @@ void loop() {
             recordTimer = 0;
         }
     }
-    // capture current footswitch state to compare with next state
     lastFootswitchState = currentFootswitchState;
 
-    // Audio Processing
+    // =================== AUDIO PROCESSING ===================
     if (audioQueue.available() > 0) {
         int16_t *buffer = audioQueue.readBuffer();
         for (int i = 0; i < 128; i++) {
@@ -139,14 +133,12 @@ void loop() {
             float processedSample = 0.0f;
 
             // Signal detection if waiting
-            if (waitingForSignal) {
-                if (fabs(inputSample) > signalThreshold) {
-                    Serial.println("Signal Detected: Starting Swell + Recording");
-                    waitingForSignal = false;
-                    recordingActive = true;
-                    startSwell();
-                    silenceTimer = 0;
-                }
+            if (waitingForSignal && fabs(inputSample) > signalThreshold) {
+                Serial.println("Signal Detected: Starting Swell + Recording");
+                waitingForSignal = false;
+                recordingActive = true;
+                startSwell();
+                silenceTimer = 0;
             }
 
             // Swell processing
@@ -163,37 +155,41 @@ void loop() {
                 silenceTimer = 0;
             }
 
-            // Recording to layer
+            // Recording to buffer
             if (recordingActive) {
                 if (bufferWriteIndex < BUFFER_SIZE) {
-                    loopBuffer[bufferWriteIndex++] += (int16_t)(processedSample * 32767.0f);
+                    loopBuffer[bufferWriteIndex++] = (int16_t)(processedSample * 32767.0f);
                 }
             }
         }
         audioQueue.freeBuffer();
     }
 
-    // Layering timing
+    // =================== RECORDING TIMEOUT ===================
     if (recordingActive && recordTimer > RECORD_SECONDS * 1000) {
         Serial.println("Layer Complete");
-        recordingActive = true; // Continue layering
-        recordTimer = 0;
+        recordingActive = false;
+        loopingActive = true;
+        playbackIndex = 0;
+        audioQueue.end();
     }
 
-    // Silence detection to freeze
+    // =================== SILENCE DETECTION TO FREEZE ===================
     if (recordingActive && silenceTimer > silentDuration) {
         Serial.println("Silence Detected: Freezing Loop");
         recordingActive = false;
         loopingActive = true;
+        playbackIndex = 0;
         audioQueue.end();
     }
 
-    // Playback Layer
-    static uint32_t playbackIndex = 0;
+    // =================== PLAYBACK LOOP ===================
     if (loopingActive) {
-        int16_t sample = loopBuffer[playbackIndex++];
-        if (playbackIndex >= BUFFER_SIZE) playbackIndex = 0;
-
-        audioOutput.analogWrite(sample);
+        int16_t *outBuffer = playQueue.getBuffer();
+        for (int i = 0; i < 128; i++) {
+            outBuffer[i] = loopBuffer[playbackIndex++];
+            if (playbackIndex >= BUFFER_SIZE) playbackIndex = 0;
+        }
+        playQueue.playBuffer();
     }
 }
