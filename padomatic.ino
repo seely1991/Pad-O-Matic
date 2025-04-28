@@ -12,7 +12,7 @@ AudioConnection          patchCord1(audioInput, 0, audioQueue);
 AudioConnection          patchCord2(audioInput, 0, audioOutput, 0);
 AudioConnection          patchCord3(audioInput, 1, audioOutput, 1);
 
-// Footswitch Setup
+// Footswitch State Constants
 const int footswitchPin = 0;
 bool footswitchPressed = false;
 bool waitingForSignal = false;
@@ -22,6 +22,7 @@ bool loopingActive = false;
 
 // Auto-swell variables
 uint32_t swellStartTime = 0;
+uint32_t swellDuration = 1500;
 
 // Buffer for 3-second recording
 const int SAMPLE_RATE = 44100;
@@ -38,21 +39,57 @@ bool silent = false;
 // Timer
 elapsedMillis recordTimer;
 
+//////////////////////////////////////////////////////////////////////////////////////
+// startSwell()
+//
+// Description: initiates the swell by setting the swell start time to current time
+//   and the swelling flag to true
+//
+// Parameters: None
+//
+// Returns: Void
+//
+//////////////////////////////////////////////////////////////////////////////////////
 void startSwell() {
     swellStartTime = millis();
     swelling = true;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////
+// computeSwellGain()
+//
+// Description:
+//   Uses a logarithmic function to calculate the volume of output at the current time
+//   in relation to the time the swell started.
+//
+// Parameters: None
+//
+// Global Variabls:
+//   - swellStartTime: time (millis) the swell started
+//   - swellDuration: time (millis) until the swell should reach full volume (1)
+// 
+// Returns:
+//   float representing the gain between 0 and 1 which lies on a logarithmic curve in
+//   relation to the time elapsed from when the swell began.
+//
+//////////////////////////////////////////////////////////////////////////////////////
 float computeSwellGain() {
     uint32_t elapsed = millis() - swellStartTime;
-    if (elapsed >= 3000) {
+    if (elapsed >= swellDuration) {
         swelling = false;
         return 1.0f;
     }
-    float t = elapsed / 3000.0f;
+    float t = elapsed / (float)swellDuration;
     return log1p(9 * t) / log1p(9);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////
+// setup()
+//
+// Description:
+//   Initializes the Teensy 4.1 and audio parameters.
+//
+//////////////////////////////////////////////////////////////////////////////////////
 void setup() {
     pinMode(footswitchPin, INPUT_PULLUP);
     AudioMemory(40);
@@ -60,9 +97,26 @@ void setup() {
     Serial.begin(9600);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////
+// loop()
+//
+// Description:
+//   Main entry point of the program, loops continously and performs all functionality
+//   of the program.
+//
+// Parameters:
+//   - None
+//
+// Global Variables:
+//
+// 
+// Reurns:
+//   Void
+//////////////////////////////////////////////////////////////////////////////////////
 void loop() {
-    // Footswitch handling
+    // initialize the lastFootswitchState as static var (HIGH)
     static bool lastFootswitchState = HIGH;
+    // capture current reading of footswitch pin
     bool currentFootswitchState = digitalRead(footswitchPin);
     if (lastFootswitchState == HIGH && currentFootswitchState == LOW) {
         if (!recordingActive && !loopingActive) {
