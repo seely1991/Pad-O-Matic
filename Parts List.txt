@@ -1,0 +1,14 @@
+Teensy 4.1
+Teensy Audio Shield (Rev D)
+3 10k Linear potentiometers
+1 10k log potentiometer
+Footswitch (soft-touch momentary) Normally open SPST
+LED
+2 1/4" Audio jacks
+DC Power Jack
+USB Panel Extension (maybe)
+
+9v DC adapter
+5V Buck Converter or LDO Regulator
+
+Hammond 1590B
