@@ -18,6 +18,7 @@ AudioConnection patchCord3(audioInput, 1, audioOutput, 1); // Right passthrough
 const int potLoopLenPin = A0;
 const int potFadePin    = A1;
 const int potVolumePin  = A2;
+const int potTonePin    = A3;
 
 // === CONSTANTS ===
 const int footswitchPin = 0;
@@ -54,6 +55,7 @@ uint32_t fadeDuration = 1000;
 float loopDurationSec = 2.0f;
 uint32_t bufferSize = SAMPLE_RATE * 2;
 float masterVolume = 1.0f;
+float toneAmount = 1.0f; // 0 = dark, 1 = bright
 
 elapsedMillis silenceTimer;
 elapsedMillis recordTimer;
@@ -67,6 +69,7 @@ int tapCount = 0;
 
 // Input tracking
 float lastInputSample = 0.0f;
+float prevLoopSample = 0.0f;
 
 ////////////////////////////////////////////////////////////////////////////////
 float mapf(int val, int inMin, int inMax, float outMin, float outMax) {
@@ -77,6 +80,7 @@ void readKnobs() {
   loopDurationSec = mapf(analogRead(potLoopLenPin), 0, 1023, 0.25f, 3.0f);
   fadeDuration = map(analogRead(potFadePin), 0, 1023, 0, 1500);
   masterVolume = mapf(analogRead(potVolumePin), 0, 1023, 0.0f, 1.0f);
+  toneAmount = mapf(analogRead(potTonePin), 0, 1023, 0.0f, 1.0f);
 
   bufferSize = min((uint32_t)(loopDurationSec * SAMPLE_RATE), (uint32_t)MAX_BUFFER_SIZE);
 }
@@ -210,23 +214,24 @@ void loop() {
       int16_t sampleA = activeBuffer[playbackIndex];
       int16_t sampleB = fadingBuffer[playbackIndex];
 
-      // Loop mix
-      int32_t mixed = crossfading
+      float rawLoop = crossfading
         ? (sampleA * fadeInGain + sampleB * fadeOutGain)
         : sampleA;
 
-      // Apply master volume
-      mixed *= masterVolume;
+      // EQ filter: brightness control
+      float filteredLoop = rawLoop * toneAmount + prevLoopSample * (1.0f - toneAmount);
+      prevLoopSample = filteredLoop;
 
-      // Add passthrough if not in listening mode
-      if (pedalState == LOOPING) {
-        mixed += (int16_t)(lastInputSample * 32767.0f);
-      }
+      float loopOut = filteredLoop * masterVolume;
+      float dryOut = (pedalState == LOOPING) ? (lastInputSample * 32767.0f) : 0.0f;
 
+      int32_t mixed = loopOut + dryOut;
       outBuffer[i] = constrain(mixed, -32768, 32767);
+
       playbackIndex++;
       if (playbackIndex >= bufferSize) playbackIndex = 0;
     }
+
     playQueue.playBuffer();
   }
 }
