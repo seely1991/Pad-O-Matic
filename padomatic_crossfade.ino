@@ -33,9 +33,16 @@ PedalState pedalState = IDLE;
 bool swelling = false;
 bool loopingActive = false;
 bool recordingActive = false;
+bool crossfading = false;
 
 uint32_t swellStartTime = 0;
-int16_t loopBuffer[BUFFER_SIZE];
+
+int16_t loopBufferA[BUFFER_SIZE];
+int16_t loopBufferB[BUFFER_SIZE];
+int16_t* activeBuffer = loopBufferA;
+int16_t* fadingBuffer = loopBufferB;
+bool usingA = true;
+
 volatile int bufferWriteIndex = 0;
 static uint32_t playbackIndex = 0;
 elapsedMillis silenceTimer;
@@ -52,6 +59,7 @@ int tapCount = 0;
 void startSwell() {
   swellStartTime = millis();
   swelling = true;
+  crossfading = true;
 }
 
 float computeSwellGain() {
@@ -91,7 +99,6 @@ void handleFootswitch() {
   }
   lastFootswitchReading = currentReading;
 
-  // Handle single / double tap
   if (tapCount == 1 && tapTimer > doubleTapThreshold) {
     if (pedalState == IDLE) {
       Serial.println("→ Entering LISTENING mode");
@@ -107,6 +114,7 @@ void handleFootswitch() {
     swelling = false;
     loopingActive = false;
     recordingActive = false;
+    crossfading = false;
     bufferWriteIndex = 0;
     playbackIndex = 0;
     audioQueue.end();
@@ -130,11 +138,16 @@ void loop() {
       bool signalActive = sqrtf(rms) > signalThreshold;
 
       if (pedalState == LISTENING && signalActive && !recordingActive) {
-        Serial.println("Signal Detected → Swell + Record");
+        Serial.println("Signal Detected → Swell + Record into alt buffer");
         startSwell();
         recordingActive = true;
         silenceTimer = 0;
         bufferWriteIndex = 0;
+
+        // Setup for ping-pong buffers
+        fadingBuffer = activeBuffer;
+        activeBuffer = usingA ? loopBufferB : loopBufferA;
+        usingA = !usingA;
       }
 
       if (swelling) {
@@ -146,26 +159,39 @@ void loop() {
       if (signalActive) silenceTimer = 0;
 
       if (recordingActive && bufferWriteIndex < BUFFER_SIZE) {
-        loopBuffer[bufferWriteIndex++] = (int16_t)(processedSample * 32767.0f);
+        activeBuffer[bufferWriteIndex++] = (int16_t)(processedSample * 32767.0f);
       }
     }
+
     audioQueue.freeBuffer();
   }
 
-  // Handle silence-based record stop
+  // End swell/record if silence
   if (recordingActive && silenceTimer > silentDuration) {
-    Serial.println("→ Recording complete, entering LOOPING");
+    Serial.println("→ Swell finished, swap buffers");
     recordingActive = false;
     loopingActive = true;
     playbackIndex = 0;
     audioQueue.end();
+    crossfading = false;
   }
 
-  // Loop playback
+  // PLAYBACK w/ CROSSFADE
   if (loopingActive) {
     int16_t *outBuffer = playQueue.getBuffer();
+    float fadeInGain = swelling ? computeSwellGain() : 1.0f;
+    float fadeOutGain = 1.0f - fadeInGain;
+
     for (int i = 0; i < 128; i++) {
-      outBuffer[i] = loopBuffer[playbackIndex++];
+      int16_t sampleA = activeBuffer[playbackIndex];
+      int16_t sampleB = fadingBuffer[playbackIndex];
+      int16_t mixed = crossfading
+                      ? (int16_t)(sampleA * fadeInGain + sampleB * fadeOutGain)
+                      : sampleA;
+
+      outBuffer[i] = mixed;
+
+      playbackIndex++;
       if (playbackIndex >= BUFFER_SIZE) playbackIndex = 0;
     }
     playQueue.playBuffer();
