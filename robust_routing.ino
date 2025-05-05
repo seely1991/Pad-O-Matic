@@ -115,20 +115,19 @@ void loop() {
   // Detect signal to start recording
   if (rmsAnalyzer.available()) {
     float level = rmsAnalyzer.read();
-    if (waitingForSignal && level > signalThreshold) {
-      Serial.println("Signal Detected: Swelling & Recording");
-      fadeInput.fadeIn(FADE_DURATION_MS);
-      fadeLoopOut.fadeOut(FADE_DURATION_MS);
-      mixToRecord.gain(0, 1.0f); // enable recording input
-      loopIndex = 0;
-      loopTimer = 0;
+    if (level > signalThreshold) {
       silenceTimer = 0;
-      waitingForSignal = false;
-      recording = true;
-    }
-
-    if (recording && level > signalThreshold) {
-      silenceTimer = 0;
+      if (waitingForSignal) {
+        Serial.println("Signal Detected: Swelling & Recording");
+        fadeInput.fadeIn(FADE_DURATION_MS);
+        fadeLoopOut.fadeOut(FADE_DURATION_MS);
+        mixToRecord.gain(0, 1.0f); // enable recording input
+        loopIndex = 0;
+        loopTimer = 0;
+        silenceTimer = 0;
+        waitingForSignal = false;
+        recording = true;
+      }
     }
   }
 
