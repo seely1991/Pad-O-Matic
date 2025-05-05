@@ -134,7 +134,7 @@ void loop() {
   if (recordQueue.available()) {
     int16_t* buffer = recordQueue.readBuffer();
     for (int i = 0; i < 128; i++) {
-      if (recording || layering) {
+      if (recording) {
         loopBuffer[loopIndex++] = buffer[i];
         if (loopIndex >= BUFFER_SAMPLES) loopIndex = 0;
       }
@@ -147,7 +147,6 @@ void loop() {
     Serial.println("Silence Detected: Layering Complete");
     recording = false;
     playingLoop = true;
-    layering = false;
     fadeLoopOut.fadeIn(FADE_DURATION_MS);
     fadeInput.fadeOut(FADE_DURATION_MS);
     mixToRecord.gain(0, 0.0f); // stop recording input
@@ -158,7 +157,6 @@ void loop() {
   if (recording && loopTimer > LOOP_DURATION_MS) {
     Serial.println("Loop Time Reached: Start Layering");
     playingLoop = true;
-    layering = true;
     loopTimer = 0;
     loopIndex = 0;
     fadeLoopOut.fadeIn(FADE_DURATION_MS);
