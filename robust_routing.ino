@@ -66,7 +66,7 @@ const int BUFFER_SAMPLES = SAMPLE_RATE * 5;
 const float signalThreshold = 0.01;
 const int silenceTimeout = 750;
 
-int16_t loopBuffer[BUFFER_SAMPLES];
+DMAMEM int16_t loopBuffer[BUFFER_SAMPLES];
 uint32_t loopIndex = 0;
 
 // STATE
