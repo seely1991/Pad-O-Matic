@@ -97,12 +97,12 @@ void handleFootswitch() {
     Serial.println("Listening for input...");
   }
 
+  // currently fades loop and input out.
   if (tapCount >= 2) {
     waitingForSignal = false;
     recording = false;
     playingLoop = false;
     mixToRecord.gain(0, 0.0f);
-    fadeInput.fadeOut(100);
     fadeLoopOut.fadeOut(100);
     tapCount = 0;
     Serial.println("Bypassed");
