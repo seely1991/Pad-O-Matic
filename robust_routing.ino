@@ -1,3 +1,31 @@
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+// Description:
+//   This program serves as the firmware flashed to a Teensy 4.0 that
+//   functions as a guitar effects pedal. The guitar pedal acts as an
+//   auto-swell/looper pedal to create continuously looped drone 
+//   sounds. 
+//     1. Clicking the footswitch once sets the pedal to "listen"
+//        for an input. 
+//     2. When input is detected, the pedal initiates recording the 
+//        loop and swells the input signal
+//     3. The looper continues to record until the input reaches a
+//        lower threshold to indicate silence. At which point, it
+//        stops recording the looper and continuously plays the loop
+//     4. In this state, it is ready to initiate a new loop once 
+//        input is detected again and crossfades the original loop
+//        out and the new actively recorded loop in.
+//     
+//     Additionally detects if a new chord is struck in the middle of
+//     recording, and if so immediately starts a new loop and cross-
+//     fades.
+//
+//     Double tapping turns the pedal off, fading out the looped 
+//     signal
+//
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 
 #include <Arduino.h>
 #include <Audio.h>
