@@ -146,6 +146,8 @@ void handleFootswitch() {
       playingLoop = true;
       recording = false;
       mixToOutput.gain(0, 1.0f); // ensure passthrough
+      mixToOutput.gain(1,1.0f);
+      mixToRecord.gain(0,1.0f);
       mixToRecord.gain(1,1.0f);
       loopIndex = 0;
       Serial.println("Listening stopped: Playback + passthrough enabled.");
