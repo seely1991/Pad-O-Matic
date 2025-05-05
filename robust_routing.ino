@@ -122,6 +122,7 @@ void loop() {
         fadeInput.fadeIn(FADE_DURATION_MS);
         fadeLoopOut.fadeOut(FADE_DURATION_MS);
         mixToRecord.gain(0, 1.0f); // enable recording input
+        mixToOutput.gain(0,1.0f);
         loopIndex = 0;
         loopTimer = 0;
         waitingForSignal = false;
@@ -147,8 +148,7 @@ void loop() {
     Serial.println("Silence Detected: Layering Complete");
     recording = false;
     playingLoop = true;
-    fadeLoopOut.fadeIn(FADE_DURATION_MS);
-    fadeInput.fadeOut(FADE_DURATION_MS);
+    mixToOutput.gain(0,0.0f);
     mixToRecord.gain(0, 0.0f); // stop recording input
     loopIndex = 0;
   }
