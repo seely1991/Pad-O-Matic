@@ -15,13 +15,16 @@ AudioMixer4              mixToRecord;
 AudioOutputI2S           i2s2;
 AudioRecordQueue         recordQueue;
 
+// See "crossfade_routing.png" for a visual representation of this routing
 AudioConnection patchCord1(i2s1, 0, fadeInput, 0);
 AudioConnection patchCord2(fadeInput, 0, mixToRecord, 0);
 AudioConnection patchCord3(fadeInput, 0, mixToOutput, 0);
+
 AudioConnection patchCord4(playQueue, 0, mixToRecord, 1);
 AudioConnection patchCord5(playQueue, fadeLoopOut);
 AudioConnection patchCord6(fadeLoopOut, 0, mixToOutput, 1);
 AudioConnection patchCord7(mixToOutput, 0, i2s2, 1);
+
 AudioConnection patchCord8(mixToRecord, recordQueue);
 
 const int footswitchPin = 0;
