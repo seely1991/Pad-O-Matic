@@ -16,6 +16,8 @@ AudioMixer4              mixToRecord;    // mixer1
 AudioOutputI2S           i2s2;
 AudioRecordQueue         recordQueue;
 
+//////////////////////////////////////////////////////////////////////
+// see routing_diagram.png for visualization
 AudioConnection patchCord1(i2s1, 0, fadeInput, 0);
 AudioConnection patchCord2(i2s1, 0, rmsAnalyzer, 0);
 AudioConnection patchCord3(playQueue, fadeLoopOut);
@@ -25,27 +27,32 @@ AudioConnection patchCord6(fadeInput, 0, mixToOutput, 0);
 AudioConnection patchCord7(fadeLoopOut, 0, mixToOutput, 1);
 AudioConnection patchCord8(mixToOutput, 0, i2s2, 0);
 AudioConnection patchCord9(mixToRecord, recordQueue);
+//////////////////////////////////////////////////////////////////////
 
+// CONSTANTS
 const int footswitchPin = 0;
 const int SAMPLE_RATE = 44100;
 const int LOOP_DURATION_MS = 3000;
 const int FADE_DURATION_MS = 1500;
-const int BUFFER_SAMPLES = SAMPLE_RATE * 5;  // 5s buffer
+const int BUFFER_SAMPLES = SAMPLE_RATE * 5;
+const float signalThreshold = 0.01;
+const int silenceTimeout = 750;
+
 int16_t loopBuffer[BUFFER_SAMPLES];
-
-bool listening = false;
-bool waitingForSignal = false;
-bool bypass = true;
-bool playingLoop = false;
-bool recordingDone = false;
-
-float signalThreshold = 0.02;
-
 uint32_t loopIndex = 0;
-elapsedMillis fadeTimer;
-elapsedMillis loopTimer;
 
-// Footswitch debounce + tap detection
+// STATE
+bool waitingForSignal = true;
+bool recording = false;
+bool playingLoop = false;
+bool layering = false;
+bool bypass = false;
+
+elapsedMillis loopTimer;
+elapsedMillis silenceTimer;
+elapsedMillis fadeTimer;
+
+// DEBOUNCE + TAP
 const unsigned long tapWindow = 400;
 const unsigned long debounceDelay = 25;
 bool lastFootswitchState = HIGH;
@@ -58,7 +65,7 @@ void setup() {
   pinMode(footswitchPin, INPUT_PULLUP);
   AudioMemory(60);
   recordQueue.begin();
-  mixToRecord.gain(0, 1.0f);
+  mixToRecord.gain(0, 0.0f);
   mixToRecord.gain(1, 1.0f);
   mixToOutput.gain(0, 1.0f);
   mixToOutput.gain(1, 1.0f);
@@ -69,94 +76,98 @@ void setup() {
 void handleFootswitch() {
   bool reading = digitalRead(footswitchPin);
 
-  if (reading != debouncedState) {
-    lastDebounceTime = millis();
-  }
-
+  if (reading != debouncedState) lastDebounceTime = millis();
   if ((millis() - lastDebounceTime) > debounceDelay) {
     if (reading != lastFootswitchState) {
       lastFootswitchState = reading;
-
       if (lastFootswitchState == LOW) {
         unsigned long now = millis();
-        if (now - lastTapTime < tapWindow) {
-          tapCount++;
-        } else {
-          tapCount = 1;
-        }
+        if (now - lastTapTime < tapWindow) tapCount++;
+        else tapCount = 1;
         lastTapTime = now;
       }
     }
   }
-
   debouncedState = reading;
 
   if (tapCount == 1 && millis() - lastTapTime > tapWindow) {
-    Serial.println("Single Tap: Arm signal detection");
     waitingForSignal = true;
-    listening = false;
+    recording = false;
     tapCount = 0;
+    Serial.println("Listening for input...");
   }
 
   if (tapCount >= 2) {
-    Serial.println("Double Tap: Bypass");
     waitingForSignal = false;
-    listening = false;
+    recording = false;
     playingLoop = false;
-    bypass = true;
+    mixToRecord.gain(0, 0.0f);
     fadeInput.fadeOut(100);
     fadeLoopOut.fadeOut(100);
-    mixToRecord.gain(1, 0.0f);
     tapCount = 0;
+    Serial.println("Bypassed");
   }
 }
 
 void loop() {
   handleFootswitch();
 
+  // Detect signal to start recording
   if (rmsAnalyzer.available()) {
     float level = rmsAnalyzer.read();
     if (waitingForSignal && level > signalThreshold) {
-      Serial.println("Signal detected: Start swell");
-      waitingForSignal = false;
-      listening = true;
+      Serial.println("Signal Detected: Swelling & Recording");
       fadeInput.fadeIn(FADE_DURATION_MS);
       fadeLoopOut.fadeOut(FADE_DURATION_MS);
-      mixToRecord.gain(1, 0.0f);
+      mixToRecord.gain(0, 1.0f); // enable recording input
       loopIndex = 0;
       loopTimer = 0;
-      fadeTimer = 0;
-      recordingDone = false;
+      silenceTimer = 0;
+      waitingForSignal = false;
+      recording = true;
+    }
+
+    if (recording && level > signalThreshold) {
+      silenceTimer = 0;
     }
   }
 
-  if (recordQueue.available() > 0) {
-    int16_t *buffer = recordQueue.readBuffer();
+  // Write to buffer
+  if (recordQueue.available()) {
+    int16_t* buffer = recordQueue.readBuffer();
     for (int i = 0; i < 128; i++) {
-      if (listening && loopIndex < BUFFER_SAMPLES) {
+      if (recording || layering) {
         loopBuffer[loopIndex++] = buffer[i];
+        if (loopIndex >= BUFFER_SAMPLES) loopIndex = 0;
       }
     }
     recordQueue.freeBuffer();
   }
 
-  if (listening && loopTimer > LOOP_DURATION_MS && !recordingDone) {
-    Serial.println("Loop complete. Playback starts.");
-    listening = false;
+  // End of layer if silence
+  if (recording && silenceTimer > silenceTimeout) {
+    Serial.println("Silence Detected: Layering Complete");
+    recording = false;
     playingLoop = true;
-    recordingDone = true;
-    loopIndex = 0;
+    layering = false;
     fadeLoopOut.fadeIn(FADE_DURATION_MS);
     fadeInput.fadeOut(FADE_DURATION_MS);
+    mixToRecord.gain(0, 0.0f); // stop recording input
+    loopIndex = 0;
   }
 
-  if (recordingDone && fadeTimer > FADE_DURATION_MS + 10) {
-    mixToRecord.gain(1, 1.0f);
-    recordingDone = false;
+  // If duration expires but still signal, go into layering
+  if (recording && loopTimer > LOOP_DURATION_MS) {
+    Serial.println("Loop Time Reached: Start Layering");
+    playingLoop = true;
+    layering = true;
+    loopTimer = 0;
+    loopIndex = 0;
+    fadeLoopOut.fadeIn(FADE_DURATION_MS);
   }
 
   if (playingLoop) {
-    int16_t *out = playQueue.getBuffer();
+    int16_t* out = playQueue.getBuffer();
     for (int i = 0; i < 128; i++) {
       out[i] = loopBuffer[loopIndex++];
       if (loopIndex >= BUFFER_SAMPLES) loopIndex = 0;
