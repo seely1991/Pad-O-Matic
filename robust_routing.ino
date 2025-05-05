@@ -52,6 +52,8 @@ elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
 elapsedMillis fadeTimer;
 
+float previousRMS = 0.0f;
+
 // DEBOUNCE + TAP
 const unsigned long tapWindow = 400;
 const unsigned long debounceDelay = 25;
@@ -117,7 +119,7 @@ void loop() {
     float level = rmsAnalyzer.read();
     if (level > signalThreshold) {
       silenceTimer = 0;
-      if (waitingForSignal) {
+      if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
         Serial.println("Signal Detected: Swelling & Recording");
         fadeInput.fadeIn(FADE_DURATION_MS);
         fadeLoopOut.fadeOut(FADE_DURATION_MS);
@@ -129,6 +131,7 @@ void loop() {
         recording = true;
       }
     }
+    previousRMS = level;
   }
 
   // Write to buffer
