@@ -124,7 +124,6 @@ void loop() {
         mixToRecord.gain(0, 1.0f); // enable recording input
         loopIndex = 0;
         loopTimer = 0;
-        silenceTimer = 0;
         waitingForSignal = false;
         recording = true;
       }
