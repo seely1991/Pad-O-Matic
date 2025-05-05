@@ -15,16 +15,13 @@ AudioMixer4              mixToRecord;
 AudioOutputI2S           i2s2;
 AudioRecordQueue         recordQueue;
 
-// See "crossfade_routing.png" for a visual representation of this routing
 AudioConnection patchCord1(i2s1, 0, fadeInput, 0);
 AudioConnection patchCord2(fadeInput, 0, mixToRecord, 0);
 AudioConnection patchCord3(fadeInput, 0, mixToOutput, 0);
-
 AudioConnection patchCord4(playQueue, 0, mixToRecord, 1);
 AudioConnection patchCord5(playQueue, fadeLoopOut);
 AudioConnection patchCord6(fadeLoopOut, 0, mixToOutput, 1);
 AudioConnection patchCord7(mixToOutput, 0, i2s2, 1);
-
 AudioConnection patchCord8(mixToRecord, recordQueue);
 
 const int footswitchPin = 0;
@@ -65,7 +62,36 @@ void setup() {
   Serial.begin(9600);
 }
 
+
+const unsigned long debounceDelay = 25;
+unsigned long lastDebounceTime = 0;
+bool debouncedState = HIGH;
+
 void handleFootswitch() {
+  bool reading = digitalRead(footswitchPin);
+
+  if (reading != debouncedState) {
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (reading != lastFootswitchState) {
+      lastFootswitchState = reading;
+
+      if (lastFootswitchState == LOW) {
+        unsigned long now = millis();
+        if (now - lastTapTime < tapWindow) {
+          tapCount++;
+        } else {
+          tapCount = 1;
+        }
+        lastTapTime = now;
+      }
+    }
+  }
+
+  debouncedState = reading;
+
   bool currentState = digitalRead(footswitchPin);
   if (lastFootswitchState == HIGH && currentState == LOW) {
     unsigned long now = millis();
