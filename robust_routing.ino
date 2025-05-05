@@ -75,6 +75,7 @@ bool recording = false;
 bool playingLoop = false;
 bool layering = false;
 bool bypass = false;
+bool footswitchOn = false;
 
 elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
@@ -120,15 +121,9 @@ void handleFootswitch() {
   }
   debouncedState = reading;
 
-  if (tapCount == 1 && millis() - lastTapTime > tapWindow) {
-    waitingForSignal = true;
-    recording = false;
-    tapCount = 0;
-    Serial.println("Listening for input...");
-  }
-
-  // currently fades loop and input out.
+  // Double tap = bypass everything
   if (tapCount >= 2) {
+    footswitchOn = false;
     waitingForSignal = false;
     recording = false;
     playingLoop = false;
@@ -136,6 +131,25 @@ void handleFootswitch() {
     fadeLoopOut.fadeOut(100);
     tapCount = 0;
     Serial.println("Bypassed");
+  }
+
+  // Single tap = toggle between listening and playing
+  else if (tapCount == 1 && millis() - lastTapTime > tapWindow) {
+    tapCount = 0;
+    footswitchOn = !footswitchOn;
+
+    if (footswitchOn) {
+      waitingForSignal = true;
+      recording = false;
+      Serial.println("Entered Listening Mode: Waiting for input...");
+    } else {
+      playingLoop = true;
+      recording = false;
+      mixToOutput.gain(0, 1.0f); // ensure passthrough
+      mixToRecord.gain(1,1.0f);
+      loopIndex = 0;
+      Serial.println("Listening stopped: Playback + passthrough enabled.");
+    }
   }
 }
 
