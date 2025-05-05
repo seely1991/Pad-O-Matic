@@ -165,6 +165,9 @@ void loop() {
   // Write to buffer
   if (recordQueue.available()) {
     int16_t* buffer = recordQueue.readBuffer();
+    if (!buffer) {
+      return;
+    }
     for (int i = 0; i < 128; i++) {
       if (recording) {
         loopBuffer[loopIndex++] = buffer[i];
@@ -195,6 +198,9 @@ void loop() {
 
   if (playingLoop) {
     int16_t* out = playQueue.getBuffer();
+    if (!out) {
+      return;
+    }
     for (int i = 0; i < 128; i++) {
       out[i] = loopBuffer[loopIndex++];
       if (loopIndex >= BUFFER_SAMPLES) loopIndex = 0;
