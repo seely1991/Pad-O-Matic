@@ -145,9 +145,10 @@ void handleFootswitch() {
     } else {
       playingLoop = true;
       recording = false;
-      mixToOutput.gain(0, 1.0f); // ensure passthrough
+      fadeInput.fadeOut(0);
+      mixToOutput.gain(1, 1.0f); // ensure passthrough
       mixToOutput.gain(1,1.0f);
-      mixToRecord.gain(0,1.0f);
+      mixToRecord.gain(0,0.0f);
       mixToRecord.gain(1,1.0f);
       loopIndex = 0;
       Serial.println("Listening stopped: Playback + passthrough enabled.");
@@ -209,7 +210,7 @@ void loop() {
     playingLoop = true;
     loopTimer = 0;
     loopIndex = 0;
-    fadeLoopOut.fadeIn(FADE_DURATION_MS);
+    fadeLoopOut.fadeIn(5);
   }
 
   if (playingLoop) {
