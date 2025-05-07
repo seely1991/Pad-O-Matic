@@ -205,8 +205,8 @@ void setReverb(float size, float mix) {
   freeverb1.roomsize(size);
   recordMixer.gain(0,mix); // dry input to recorder
   recordMixer.gain(1,1.0 - mix); // reverb input to recorder
-  filterMix.gain(0,mix); // dry input to filter/output
-  filterMix.gain(1,1.0 - mix); // reverb input to filter/output
+  filterMixer.gain(0,mix); // dry input to filter/output
+  filterMixer.gain(1,1.0 - mix); // reverb input to filter/output
 }
 
 void setEQ(float position) {
