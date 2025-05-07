@@ -189,7 +189,7 @@ void handleFootswitch() {
     if (recordEnabled) {
       inputFader.fadeOut(0); // mute input, ready for swell
       outputMixer.gain(0,0.0f); // mute true bypass
-      filterMixer.gain(0,1.0f) // unmute eq'd input
+      filterMixer.gain(0,1.0f); // unmute eq'd input
       waitingForSignal = true;
       recording = false;
       Serial.println("Entered Listening Mode: Waiting for input...");
@@ -250,7 +250,7 @@ void loop() {
 
   handleFootswitch();
 
-  if (!pedalOn) continue;
+  if (!pedalOn) return;
 
   setDelay(delayMix, delayTime);
   setReverb(reverbMix);
