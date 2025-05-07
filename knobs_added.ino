@@ -175,6 +175,7 @@ void handleFootswitch() {
     if (footswitchOn) {
       inputFader.fadeOut(0); // mute input, ready for swell
       outputMixer.gain(0,0.0f); // mute true bypass
+      filterMixer.gain(0,1.0f) // unmute eq'd input
       waitingForSignal = true;
       recording = false;
       Serial.println("Entered Listening Mode: Waiting for input...");
@@ -183,6 +184,7 @@ void handleFootswitch() {
       recording = false;
       inputFader.fadeIn(0); // unmute input (in case muted)
       outputMixer.gain(0,1.0f); // unmute true bypass
+      filterMixer.gain(0,0.0f); // mute eq'd input
       loopIndex = 0;
       Serial.println("Listening stopped: Playback + passthrough enabled.");
     }
