@@ -168,9 +168,9 @@ void handleFootswitch() {
   else if (tapCount == 1 && millis() - lastTapTime > tapWindow) {
     tapCount = 0;
     footswitchOn = !footswitchOn;
-    outputMixer.gain(1,0.0f); // unmute eq'd input/loop (low)
-    outputMixer.gain(2,0.0f); // unmute eq'd input/loop (mid)
-    outputMixer.gain(3,0.0f); // unmute eq'd input/loop (high)
+    outputMixer.gain(1,1.0f); // unmute eq'd input/loop (low)
+    outputMixer.gain(2,1.0f); // unmute eq'd input/loop (mid)
+    outputMixer.gain(3,1.0f); // unmute eq'd input/loop (high)
 
     if (footswitchOn) {
       inputFader.fadeOut(0); // mute input, ready for swell
@@ -213,9 +213,9 @@ void setEQ(float position) {
     float midGain = 1.0 - (fabs(scaledPos) * 0.25);   // 1.0 to 0.75
 
     // Set the filter parameters
-    highPass.setHighpass(0, lowCutFreq, qFactor);       // Tighten lows
-    midScoop.setPeak(1, 1000.0, qFactor, midGain);      // Scoop mids
-    lowPass.setLowpass(2, highCutFreq, qFactor);        // Tame highs
+    lowFilter.setHighpass(0, lowCutFreq, qFactor);       // Tighten lows
+    midFilter.setPeak(1, 1000.0, qFactor, midGain);      // Scoop mids
+    highFilter.setLowpass(2, highCutFreq, qFactor);        // Tame highs
 }
 
 void setLoopMix(float position) {
