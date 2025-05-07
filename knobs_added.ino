@@ -97,7 +97,8 @@ bool recording = false;
 bool playingLoop = false;
 bool layering = false;
 bool bypass = false;
-bool footswitchOn = false;
+bool recordEnabled = false;
+bool pedalOn = false;
 
 elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
@@ -125,7 +126,14 @@ void setup() {
   recordMixer.gain(1, 0.0f); // mute loop for first record pass
   filterMixer.gain(0, 1.0f); // input to filter
   filterMixer.gain(1, 1.0f); // loop to filter
-  outputMixer.gain(0, 1.0f); // unmute true bypass (pedal starts in off position)
+  outputMixer.gain(0,1.0f); // unmute true bypass at output
+  outputMixer.gain(1,0.0f); // mute eq'd input/loop (low)
+  outputMixer.gain(2,0.0f); // mute eq'd input/loop (mid)
+  outputMixer.gain(3,0.0f); // mute eq'd input/loop (high)
+  delayMixer.gain(1,0.0f);
+  delayMixer.gain(2, 0.0f);
+  delayMixer.gain(3, 0.0f);
+  freeverb1.roomsize(0);
 
   // Clear buffer on boot
   memset(loopBuffer, 0, sizeof(loopBuffer));
@@ -150,7 +158,8 @@ void handleFootswitch() {
 
   // Double tap = bypass everything
   if (tapCount >= 2) {
-    footswitchOn = false;
+    pedalOn = false;
+    recordEnabled = false;
     waitingForSignal = false;
     recording = false;
     playingLoop = false;
@@ -159,6 +168,10 @@ void handleFootswitch() {
     outputMixer.gain(1,0.0f); // mute eq'd input/loop (low)
     outputMixer.gain(2,0.0f); // mute eq'd input/loop (mid)
     outputMixer.gain(3,0.0f); // mute eq'd input/loop (high)
+    delayMixer.gain(1,0.0f);
+    delayMixer.gain(2, 0.0f);
+    delayMixer.gain(3, 0.0f);
+    freeverb1.roomsize(0);
     memset(loopBuffer, 0, sizeof(loopBuffer));
     tapCount = 0;
     Serial.println("Bypassed");
@@ -167,12 +180,13 @@ void handleFootswitch() {
   // Single tap = toggle between listening and playing
   else if (tapCount == 1 && millis() - lastTapTime > tapWindow) {
     tapCount = 0;
-    footswitchOn = !footswitchOn;
+    pedalOn = true;
+    recordEnabled = !recordEnabled;
     outputMixer.gain(1,1.0f); // unmute eq'd input/loop (low)
     outputMixer.gain(2,1.0f); // unmute eq'd input/loop (mid)
     outputMixer.gain(3,1.0f); // unmute eq'd input/loop (high)
 
-    if (footswitchOn) {
+    if (recordEnabled) {
       inputFader.fadeOut(0); // mute input, ready for swell
       outputMixer.gain(0,0.0f); // mute true bypass
       filterMixer.gain(0,1.0f) // unmute eq'd input
@@ -235,6 +249,8 @@ void loop() {
   float loopMix = analogRead(loopMixPin) / 1023.0f;
 
   handleFootswitch();
+
+  if (!pedalOn) continue;
 
   setDelay(delayMix, delayTime);
   setReverb(reverbMix);
