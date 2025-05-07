@@ -41,7 +41,7 @@ AudioEffectDelay         delay1;         //xy=405,317
 AudioPlayQueue           playQueue;         //xy=469.6868591308594,432.46460723876953
 AudioMixer4              delayMixer;         //xy=552,291
 AudioEffectFade          loopFader;          //xy=650.3130760192871,361.7979431152344
-AudioEffectFreeverb      freeverb1;      //xy=695,291
+AudioEffectFreeverb      freeverb1;      //xy=698.3333625793457,291.0000114440918
 AudioMixer4              recordMixer;         //xy=821.8181686401367,514.4040832519531
 AudioMixer4              filterMixer;         //xy=873.0000343322754,368.66665267944336
 AudioRecordQueue         recordQueue;         //xy=996.4646606445312,514.6767616271973
@@ -58,29 +58,32 @@ AudioConnection          patchCord5(delay1, 1, delayMixer, 1);
 AudioConnection          patchCord6(delay1, 2, delayMixer, 2);
 AudioConnection          patchCord7(delay1, 3, delayMixer, 3);
 AudioConnection          patchCord8(playQueue, loopFader);
-AudioConnection          patchCord9(playQueue, 0, recordMixer, 1);
+AudioConnection          patchCord9(playQueue, 0, recordMixer, 2);
 AudioConnection          patchCord10(delayMixer, freeverb1);
-AudioConnection          patchCord11(loopFader, 0, filterMixer, 1);
-AudioConnection          patchCord12(freeverb1, 0, recordMixer, 0);
-AudioConnection          patchCord13(freeverb1, 0, filterMixer, 0);
+AudioConnection          patchCord11(delayMixer, 0, filterMixer, 0);
+AudioConnection          patchCord12(delayMixer, 0, recordMixer, 0);
+AudioConnection          patchCord13(loopFader, 0, filterMixer, 2);
 AudioConnection          patchCord14(freeverb1, 0, outputMixer, 0);
-AudioConnection          patchCord15(recordMixer, recordQueue);
-AudioConnection          patchCord16(filterMixer, lowFilter);
-AudioConnection          patchCord17(filterMixer, midFilter);
-AudioConnection          patchCord18(filterMixer, highFilter);
-AudioConnection          patchCord19(lowFilter, 0, outputMixer, 1);
-AudioConnection          patchCord20(midFilter, 0, outputMixer, 2);
-AudioConnection          patchCord21(highFilter, 0, outputMixer, 3);
-AudioConnection          patchCord22(outputMixer, 0, i2s2, 0);
+AudioConnection          patchCord15(freeverb1, 0, filterMixer, 1);
+AudioConnection          patchCord16(freeverb1, 0, recordMixer, 1);
+AudioConnection          patchCord17(recordMixer, recordQueue);
+AudioConnection          patchCord18(filterMixer, lowFilter);
+AudioConnection          patchCord19(filterMixer, midFilter);
+AudioConnection          patchCord20(filterMixer, highFilter);
+AudioConnection          patchCord21(lowFilter, 0, outputMixer, 1);
+AudioConnection          patchCord22(midFilter, 0, outputMixer, 2);
+AudioConnection          patchCord23(highFilter, 0, outputMixer, 3);
+AudioConnection          patchCord24(outputMixer, 0, i2s2, 0);
 // GUItool: end automatically generated code
 
 
 const int footswitchPin = 0;
 const int delayMixPin = A0;
 const int delayTimePin = A1;
-const int reverbMixPin = A2;
-const int eqPin = A3;
-const int loopMixPin = A4;
+const int reverbSizePin = A2;
+const int reverbMixPin = A3;
+const int eqPin = A4;
+const int loopMixPin = A5;
 const int SAMPLE_RATE = 44100;
 const int LOOP_DURATION_MS = 3000;
 const int FADE_DURATION_MS = 1500;
@@ -121,10 +124,12 @@ void setup() {
   Serial.begin(9600);
 
   // Initialize Mixer Gains
-  recordMixer.gain(0, 1.0f); // input to record
-  recordMixer.gain(1, 0.0f); // mute loop for first record pass
-  filterMixer.gain(0, 1.0f); // input to filter
-  filterMixer.gain(1, 1.0f); // loop to filter
+  recordMixer.gain(0, 1.0f); // dry input to record
+  recordMixer.gain(1, 1.0f); // reverb input to record
+  recordMixer.gain(2, 0.0f); // mute loop for first record pass
+  filterMixer.gain(0, 1.0f); // dry input to filter
+  filterMixer.gain(1, 1.0f); // reverb input to filter
+  filterMixer.gain(2, 1.0f); // loop to filter
   outputMixer.gain(0, 1.0f); // unmute true bypass (pedal starts in off position)
 
   // Clear buffer on boot
@@ -196,8 +201,12 @@ void setDelay(float mix, float time) {
   }
 }
 
-void setReverb(float position) {
-  freeverb1.roomsize(position);
+void setReverb(float size, float mix) {
+  freeverb1.roomsize(size);
+  recordMixer.gain(0,mix); // dry input to recorder
+  recordMixer.gain(1,1.0 - mix); // reverb input to recorder
+  filterMix.gain(0,mix); // dry input to filter/output
+  filterMix.gain(1,1.0 - mix); // reverb input to filter/output
 }
 
 void setEQ(float position) {
@@ -213,9 +222,9 @@ void setEQ(float position) {
     float midGain = 1.0 - (fabs(scaledPos) * 0.25);   // 1.0 to 0.75
 
     // Set the filter parameters
-    highPass.setHighpass(0, lowCutFreq, qFactor);       // Tighten lows
-    midScoop.setPeak(1, 1000.0, qFactor, midGain);      // Scoop mids
-    lowPass.setLowpass(2, highCutFreq, qFactor);        // Tame highs
+    highFilter.setHighpass(0, lowCutFreq, qFactor);       // Tighten lows
+    midFilter.setPeak(1, 1000.0, qFactor, midGain);      // Scoop mids
+    lowFilter.setLowpass(2, highCutFreq, qFactor);        // Tame highs
 }
 
 void setLoopMix(float position) {
@@ -227,6 +236,7 @@ void setLoopMix(float position) {
 void loop() {
   float delayMix = analogRead(delayMixPin) / 1023.0f;
   float delayTime = analogRead(delayTimePin) / 1023.0f * 1000.0f;
+  float reverbSize = analogRead(reverbSizePin) / 1023.0f;
   float reverbMix = analogRead(reverbMixPin) / 1023.0f;
   float eqMix = analogRead(eqPin) / 1023.0f;
   float loopMix = analogRead(loopMixPin) / 1023.0f;
@@ -245,7 +255,7 @@ void loop() {
       silenceTimer = 0;
       if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
         Serial.println("Signal Detected: Swelling & Recording");
-        recordMixer.gain(1, 0.0f); // mute loop for first pass
+        recordMixer.gain(2, 0.0f); // mute loop for first pass
         inputFader.fadeIn(FADE_DURATION_MS);
         loopFader.fadeOut(FADE_DURATION_MS);
         loopIndex = 0;
@@ -288,7 +298,7 @@ void loop() {
     loopTimer = 0;
     loopIndex = 0;
     loopFader.fadeIn(0); // unmute loop in fader (starts loop output)
-    recordMixer.gain(1, 1.0f); // unmute loop in mixer (starts overdub recording)
+    recordMixer.gain(2, 1.0f); // unmute loop in mixer (starts overdub recording)
   }
 
   if (playingLoop) {
