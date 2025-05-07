@@ -33,12 +33,6 @@
 #include <SPI.h>
 #include <SD.h>
 
-#include <Audio.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
-#include <SerialFlash.h>
-
 // GUItool: begin automatically generated code
 AudioInputI2S            i2s1;           //xy=94,381.3636169433594
 AudioEffectFade          inputFader;          //xy=269,317
