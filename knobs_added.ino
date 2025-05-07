@@ -191,7 +191,8 @@ void handleFootswitch() {
 
 void setDelay(float mix, float time) {
   for (int i = 0; i < 4; i++) {
-    delayMixer.gain(i, mix);
+    float taper = (4 - i) / 4;
+    delayMixer.gain(i, mix * taper);
     delay1.delay(i, time);
   }
 }
@@ -213,9 +214,9 @@ void setEQ(float position) {
     float midGain = 1.0 - (fabs(scaledPos) * 0.25);   // 1.0 to 0.75
 
     // Set the filter parameters
-    lowFilter.setHighpass(0, lowCutFreq, qFactor);       // Tighten lows
+    highFilter.setHighpass(0, lowCutFreq, qFactor);       // Tighten lows
     midFilter.setPeak(1, 1000.0, qFactor, midGain);      // Scoop mids
-    highFilter.setLowpass(2, highCutFreq, qFactor);        // Tame highs
+    lowFilter.setLowpass(2, highCutFreq, qFactor);        // Tame highs
 }
 
 void setLoopMix(float position) {
