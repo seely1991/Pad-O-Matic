@@ -159,7 +159,7 @@ void handleFootswitch() {
     outputMixer.gain(1,0.0f); // mute eq'd input/loop (low)
     outputMixer.gain(2,0.0f); // mute eq'd input/loop (mid)
     outputMixer.gain(3,0.0f); // mute eq'd input/loop (high)
-    
+    memset(loopBuffer, 0, sizeof(loopBuffer));
     tapCount = 0;
     Serial.println("Bypassed");
   }
@@ -227,7 +227,7 @@ void setLoopMix(float position) {
 
 void loop() {
   float delayMix = analogRead(delayMixPin) / 1023.0f;
-  float delayTime = analogRead(delayTimePin) / 1023.0f * 1000.0f;
+  float delayTime = constrain(analogRead(delayTimePin) / 1023.0f * 1000.0f, 0, 1000);
   float reverbMix = analogRead(reverbMixPin) / 1023.0f;
   float eqMix = analogRead(eqPin) / 1023.0f;
   float loopMix = analogRead(loopMixPin) / 1023.0f;
