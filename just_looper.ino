@@ -63,12 +63,14 @@ const int loopMixPin = A1;
 const int SAMPLE_RATE = 44100;
 const int LOOP_DURATION_MS = 3000;
 const int FADE_DURATION_MS = 1500;
-const int BUFFER_SAMPLES = SAMPLE_RATE * 5;
+const int BUFFER_SAMPLES = SAMPLE_RATE * (LOOP_DURATION_MS + FADE_DURATION_MS) * 1.25;
 const float signalThreshold = 0.01;
 const int silenceTimeout = 750;
 
 DMAMEM int16_t loopBuffer[BUFFER_SAMPLES];
-uint32_t loopIndex = 0;
+uint32_t writeIndex = 0;
+uint32_t readIndex = 0;
+uint32_t loopStart = 0;
 
 // STATE
 bool waitingForSignal = true;
@@ -96,7 +98,6 @@ unsigned int tapCount = 0;
 void setup() {
   pinMode(footswitchPin, INPUT_PULLUP);
   AudioMemory(60);
-  recordQueue.begin();
   Serial.begin(9600);
 
   // Initialize Mixer Gains
@@ -135,7 +136,12 @@ void handleFootswitch() {
     outputMixer.gain(0,1.0f); // unmute true bypass at output
     outputMixer.gain(1,0.0f); // mute loop
     memset(loopBuffer, 0, sizeof(loopBuffer));
+    recordQueue.end();
+    recordQueue.clear();
     tapCount = 0;
+    readIndex = 0;
+    writeIndex = 0;
+    loopStart = 0;
     Serial.println("Bypassed");
   }
 
@@ -151,9 +157,17 @@ void handleFootswitch() {
       playingLoop = true;
       recording = false;
       inputFader.fadeIn(0); // unmute input (in case muted)
-      loopIndex = 0;
       Serial.println("Listening stopped: Playback + passthrough enabled.");
     }
+  }
+}
+
+int roundInt(a, b) {
+  int remainder = a % b;
+  if (remainder < b / 2) {
+    return a - remainder;
+  } else {
+    return a + (b - remainder);
   }
 }
 
@@ -175,17 +189,16 @@ void loop() {
   setLoopMix(loopMix);
 
   // Detect signal to start recording
-  if (rmsAnalyzer.available()) {
+  if (inputAnalyzer.available()) {
     float level = inputAnalyzer.read();
     if (level > signalThreshold) {
       silenceTimer = 0;
       if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
+        recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
         inputFader.fadeIn(FADE_DURATION_MS);
         loopFader.fadeOut(FADE_DURATION_MS);
-        loopIndex = 0;
-        loopTimer = 0;
         waitingForSignal = false;
         recording = true;
       }
@@ -194,16 +207,12 @@ void loop() {
   }
 
   // Write to buffer
-  if (recordQueue.available()) {
+  if (recording && recordQueue.available()) {
     int16_t* buffer = recordQueue.readBuffer();
-    if (!buffer) {
-      return;
-    }
+    if (!buffer) return;
     for (int i = 0; i < 128; i++) {
-      if (recording) {
-        loopBuffer[loopIndex++] = buffer[i];
-        if (loopIndex >= BUFFER_SAMPLES) loopIndex = 0;
-      }
+      loopBuffer[writeIndex++] = buffer[i];
+      if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
     }
     recordQueue.freeBuffer();
   }
@@ -214,7 +223,7 @@ void loop() {
     recording = false;
     playingLoop = true;
     inputFader.fadeOut(0); // mute input, ready for swell
-    loopIndex = 0;
+    recordQueue.end();
   }
 
   // If duration expires but still signal, go into layering
@@ -222,19 +231,18 @@ void loop() {
     Serial.println("Loop Time Reached: Start Layering");
     playingLoop = true;
     loopTimer = 0;
-    loopIndex = 0;
+    readIndex = loopStart; // may not be necessary since playQueue advances even when faded out
+    loopStart = writeIndex;
     loopFader.fadeIn(0); // unmute loop in fader (starts loop output)
     recordMixer.gain(1, 1.0f); // unmute loop in mixer (starts overdub recording)
   }
 
   if (playingLoop) {
     int16_t* out = playQueue.getBuffer();
-    if (!out) {
-      return;
-    }
+    if (!out) return;
     for (int i = 0; i < 128; i++) {
-      out[i] = loopBuffer[loopIndex++];
-      if (loopIndex >= BUFFER_SAMPLES) loopIndex = 0;
+      out[i] = loopBuffer[readIndex++];
+      if (readIndex >= BUFFER_SAMPLES) readIndex = 0;
     }
     playQueue.playBuffer();
   }
