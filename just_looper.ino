@@ -66,7 +66,8 @@ const int MAX_LOOP_DURATION = 3000;
 const in MIN_LOOP_DURATION = 500;
 const int MAX_LOOP_FADE_DURATION = 1500;
 const int SAMPLE_RATE = 44100;
-const int BUFFER_SAMPLES = SAMPLE_RATE * (MAX_LOOP_DURATION + MAX_LOOP_FADE_DURATION) * 1.25;
+const float BUFFER_PADDING = 1.25;
+const int BUFFER_SAMPLES = SAMPLE_RATE * (MAX_LOOP_DURATION + MAX_LOOP_FADE_DURATION * BUFFER_PADDING);
 const float signalThreshold = 0.01;
 const int silenceTimeout = 750;
 const float loopGainDecay = 0.95;
@@ -204,6 +205,9 @@ void loop() {
       if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
         //fadeDuration = (int)(fadeDurationPos * MAX_FADE_DURATION);
         //loopDuration = (int)(loopDurationPos * (MAX_LOOP_DURATION - MIN_LOOP_DURATION) + MIN_LOOP_DURATION);
+        if (!recording && playingLoop) {
+          writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING);
+        }
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
