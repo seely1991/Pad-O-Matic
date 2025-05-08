@@ -66,6 +66,7 @@ const int FADE_DURATION_MS = 1500;
 const int BUFFER_SAMPLES = SAMPLE_RATE * (LOOP_DURATION_MS + FADE_DURATION_MS) * 1.25;
 const float signalThreshold = 0.01;
 const int silenceTimeout = 750;
+const float loopGainDecay = 0.9;
 
 DMAMEM int16_t loopBuffer[BUFFER_SAMPLES];
 uint32_t writeIndex = 0;
@@ -234,7 +235,7 @@ void loop() {
     readIndex = loopStart; // may not be necessary since playQueue advances even when faded out
     loopStart = writeIndex;
     loopFader.fadeIn(0); // unmute loop in fader (starts loop output)
-    recordMixer.gain(1, 1.0f); // unmute loop in mixer (starts overdub recording)
+    recordMixer.gain(1, loopGainDecay); // unmute loop in mixer (starts overdub recording)
   }
 
   if (playingLoop) {
