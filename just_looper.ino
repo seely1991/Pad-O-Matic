@@ -76,13 +76,10 @@ uint32_t loopStart = 0;
 bool waitingForSignal = true;
 bool recording = false;
 bool playingLoop = false;
-bool layering = false;
-bool bypass = false;
 bool footswitchOn = false;
 
 elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
-elapsedMillis fadeTimer;
 
 float previousRMS = 0.0f;
 
