@@ -75,6 +75,7 @@ DMAMEM int16_t loopBuffer[BUFFER_SAMPLES];
 uint32_t writeIndex = 0;
 uint32_t readIndex = 0;
 uint32_t loopStart = 0;
+uint32_t loopEnd = 0;
 
 // STATE
 bool waitingForSignal = true;
@@ -188,12 +189,12 @@ void setLoopMix(float position) {
 void loop() {
 
 
-  float loopMix = analogRead(loopMixPin) / 1023.0f;
-  float loopDurationPos = analogRead(loopDurationPin) / 1023.0f;
-  float fadeDurationPos = analogRead(fadeDurationPin) / 1023.0f;
+  //float loopMix = analogRead(loopMixPin) / 1023.0f;
+  //float loopDurationPos = analogRead(loopDurationPin) / 1023.0f;
+  //float fadeDurationPos = analogRead(fadeDurationPin) / 1023.0f;
 
   handleFootswitch();
-  setLoopMix(loopMix);
+  //setLoopMix(loopMix);
 
   // Detect signal to start recording
   if (inputAnalyzer.available()) {
@@ -201,16 +202,17 @@ void loop() {
     if (level > signalThreshold) {
       silenceTimer = 0;
       if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
+        //fadeDuration = (int)(fadeDurationPos * MAX_FADE_DURATION);
+        //loopDuration = (int)(loopDurationPos * (MAX_LOOP_DURATION - MIN_LOOP_DURATION) + MIN_LOOP_DURATION);
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
-        fadeDuration = (int)(fadeDurationPos * MAX_FADE_DURATION);
         inputFader.fadeIn(fadeDuration);
         loopFader.fadeOut(fadeDuration);
         waitingForSignal = false;
         recording = true;
         loopTimer = 0;
-        loopDuration = (int)(loopDurationPos * (MAX_LOOP_DURATION - MIN_LOOP_DURATION) + MIN_LOOP_DURATION);
+        
       }
     }
     previousRMS = level;
@@ -225,6 +227,9 @@ void loop() {
       if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
     }
     recordQueue.freeBuffer();
+  } else if (playingLoop) {
+    writeIndex++;
+    if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
   }
 
   // End of layer if silence
@@ -232,6 +237,7 @@ void loop() {
     Serial.println("Silence Detected: Layering Complete");
     recording = false;
     playingLoop = true;
+    loopEnd = (loopStart + SAMPLE_RATE * loopDuration) % BUFFER_SAMPLES;
     inputFader.fadeOut(0); // mute input, ready for swell
     recordQueue.end();
   }
@@ -253,6 +259,9 @@ void loop() {
     for (int i = 0; i < 128; i++) {
       out[i] = loopBuffer[readIndex++];
       if (readIndex >= BUFFER_SAMPLES) readIndex = 0;
+      if (!recording && readIndex >= loopEnd) {
+        readIndex = loopStart;
+      }
     }
     playQueue.playBuffer();
   }
