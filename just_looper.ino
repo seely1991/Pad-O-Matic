@@ -219,7 +219,7 @@ void loop() {
         waitingForSignal = false;
         recording = true;
         loopTimer = 0;
-        
+        loopStart = writeIndex;
       }
     }
     previousRMS = level;
