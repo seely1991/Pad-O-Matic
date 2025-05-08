@@ -187,6 +187,7 @@ void loop() {
 
   handleFootswitch();
   setLoopMix(loopMix);
+  // can set fade duration here
 
   // Detect signal to start recording
   if (inputAnalyzer.available()) {
@@ -201,6 +202,8 @@ void loop() {
         loopFader.fadeOut(FADE_DURATION_MS);
         waitingForSignal = false;
         recording = true;
+        loopTimer = 0;
+        // update LOOP_DURATION here
       }
     }
     previousRMS = level;
