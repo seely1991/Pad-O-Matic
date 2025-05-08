@@ -83,6 +83,7 @@ bool waitingForSignal = true;
 bool recording = false;
 bool playingLoop = false;
 bool footswitchOn = false;
+bool readerCatchingUp = false;
 
 elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
@@ -149,6 +150,8 @@ void handleFootswitch() {
     readIndex = 0;
     writeIndex = 0;
     loopStart = 0;
+    loopEnd = 0;
+    readerCatchingUp = false;
     Serial.println("Bypassed");
   }
 
@@ -178,15 +181,6 @@ int roundInt(a, b) {
   }
 }
 
-void setLoopMix(float position) {
-  if (!recording) {
-    outputMixer.gain(0,1.0f);
-  } else {
-    outputMixer.gain(0,position);
-  }
-  outputMixer.gain(1, position);
-}
-
 void loop() {
 
 
@@ -211,6 +205,7 @@ void loop() {
         if (!recording && playingLoop) {
           writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLE;
         }
+        loopStart = writeIndex;
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
@@ -219,7 +214,6 @@ void loop() {
         waitingForSignal = false;
         recording = true;
         loopTimer = 0;
-        loopStart = writeIndex;
       }
     }
     previousRMS = level;
@@ -245,6 +239,7 @@ void loop() {
     recording = false;
     playingLoop = true;
     loopEnd = (loopStart + SAMPLE_RATE * loopDuration) % BUFFER_SAMPLES;
+    readerCatchingUp = true;
     inputFader.fadeOut(0); // mute input, ready for swell
     recordQueue.end();
   }
@@ -258,6 +253,7 @@ void loop() {
     loopStart = writeIndex;
     loopFader.fadeIn(0); // unmute loop in fader (starts loop output)
     recordMixer.gain(1, loopGainDecay); // unmute loop in mixer (starts overdub recording)
+    readerCatchingUp = false;
   }
 
   if (playingLoop) {
@@ -265,9 +261,15 @@ void loop() {
     if (!out) return;
     for (int i = 0; i < 128; i++) {
       out[i] = loopBuffer[readIndex++];
-      if (readIndex >= BUFFER_SAMPLES) readIndex = 0;
-      if (!recording && readIndex >= loopEnd) {
-        readIndex = loopStart;
+      if (readIndex >= BUFFER_SAMPLES) {
+        readIndex = 0;
+      }
+      if (!recording) {
+        if (readerCatchingUp && readIndex >= loopStart) {
+          readerCatchingUp = false;
+        } else if (!readerCatchingUp && readIndex >= loopEnd) {
+          readIndex = loopStart;
+        }
       }
     }
     playQueue.playBuffer();
