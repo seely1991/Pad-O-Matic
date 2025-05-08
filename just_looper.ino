@@ -209,7 +209,7 @@ void loop() {
         // because of this, writeIndex will need to be recalculated far enough ahead of the readIndex
         // to allow the playQueue to finish fading out
         if (!recording && playingLoop) {
-          writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING);
+          writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLE;
         }
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
