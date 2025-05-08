@@ -205,6 +205,9 @@ void loop() {
       if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
         //fadeDuration = (int)(fadeDurationPos * MAX_FADE_DURATION);
         //loopDuration = (int)(loopDurationPos * (MAX_LOOP_DURATION - MIN_LOOP_DURATION) + MIN_LOOP_DURATION);
+        // writeIndex will be lost if recording has not been ocurring while playQueue has been playing loop
+        // because of this, writeIndex will need to be recalculated far enough ahead of the readIndex
+        // to allow the playQueue to finish fading out
         if (!recording && playingLoop) {
           writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING);
         }
