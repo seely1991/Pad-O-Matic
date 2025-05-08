@@ -83,7 +83,7 @@ bool waitingForSignal = true;
 bool recording = false;
 bool playingLoop = false;
 bool footswitchOn = false;
-bool readerCatchingUp = false;
+bool readerNeedsToWrap = false;
 
 elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
@@ -151,7 +151,7 @@ void handleFootswitch() {
     writeIndex = 0;
     loopStart = 0;
     loopEnd = 0;
-    readerCatchingUp = false;
+    readerNeedsToWrap = false;
     Serial.println("Bypassed");
   }
 
@@ -169,15 +169,6 @@ void handleFootswitch() {
       inputFader.fadeIn(0); // unmute input (in case muted)
       Serial.println("Listening stopped: Playback + passthrough enabled.");
     }
-  }
-}
-
-int roundInt(a, b) {
-  int remainder = a % b;
-  if (remainder < b / 2) {
-    return a - remainder;
-  } else {
-    return a + (b - remainder);
   }
 }
 
@@ -239,7 +230,9 @@ void loop() {
     recording = false;
     playingLoop = true;
     loopEnd = (loopStart + SAMPLE_RATE * loopDuration) % BUFFER_SAMPLES;
-    readerCatchingUp = true;
+    if (readerIndex > loopStart) {
+      readerNeedsToWrap = true;
+    }
     inputFader.fadeOut(0); // mute input, ready for swell
     recordQueue.end();
   }
@@ -263,11 +256,9 @@ void loop() {
       out[i] = loopBuffer[readIndex++];
       if (readIndex >= BUFFER_SAMPLES) {
         readIndex = 0;
+        readerNeedsToWrap = false;
       }
-      if (!recording) {
-        if (readerCatchingUp && readIndex >= loopStart) {
-          readerCatchingUp = false;
-        } else if (!readerCatchingUp && readIndex >= loopEnd) {
+      if (!recording && !readerNeedsToWrap && readIndex >= loopEnd) {
           readIndex = loopStart;
         }
       }
