@@ -58,12 +58,15 @@ AudioConnection          patchCord10(outputMixer, 0, i2s2, 0);
 
 
 const int footswitchPin = 0;
-const int eqPin = A0;
-const int loopMixPin = A1;
+const int loopMixPin = A0;
+const int loopDurationPin = A1;
+const int fadeDurationPin = A2;
+// const int eqPin = A3;
+const int MAX_LOOP_DURATION = 3000;
+const in MIN_LOOP_DURATION = 500;
+const int MAX_LOOP_FADE_DURATION = 1500;
 const int SAMPLE_RATE = 44100;
-const int LOOP_DURATION_MS = 3000;
-const int FADE_DURATION_MS = 1500;
-const int BUFFER_SAMPLES = SAMPLE_RATE * (LOOP_DURATION_MS + FADE_DURATION_MS) * 1.25;
+const int BUFFER_SAMPLES = SAMPLE_RATE * (MAX_LOOP_DURATION + MAX_LOOP_FADE_DURATION) * 1.25;
 const float signalThreshold = 0.01;
 const int silenceTimeout = 750;
 const float loopGainDecay = 0.95;
@@ -81,6 +84,9 @@ bool footswitchOn = false;
 
 elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
+
+int loopDuration = MAX_LOOP_DURATION;
+int fadeDuration = MAX_FADE_DURATION;
 
 float previousRMS = 0.0f;
 
@@ -102,6 +108,7 @@ void setup() {
   recordMixer.gain(0, 1.0f); // input to record
   recordMixer.gain(1, 0.0f); // mute loop for first record pass
   outputMixer.gain(0, 1.0f); // unmute true bypass (pedal starts in off position)
+  outputMixer.gain(1, 1.0f); // unmute outputMixer
 
   // Clear buffer on boot
   memset(loopBuffer, 0, sizeof(loopBuffer));
@@ -182,10 +189,11 @@ void loop() {
 
 
   float loopMix = analogRead(loopMixPin) / 1023.0f;
+  float loopDurationPos = analogRead(loopDurationPin) / 1023.0f;
+  float fadeDurationPos = analogRead(fadeDurationPin) / 1023.0f;
 
   handleFootswitch();
   setLoopMix(loopMix);
-  // can set fade duration here
 
   // Detect signal to start recording
   if (inputAnalyzer.available()) {
@@ -196,12 +204,13 @@ void loop() {
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
-        inputFader.fadeIn(FADE_DURATION_MS);
-        loopFader.fadeOut(FADE_DURATION_MS);
+        fadeDuration = (int)(fadeDurationPos * MAX_FADE_DURATION);
+        inputFader.fadeIn(fadeDuration);
+        loopFader.fadeOut(fadeDuration);
         waitingForSignal = false;
         recording = true;
         loopTimer = 0;
-        // update LOOP_DURATION here
+        loopDuration = (int)(loopDurationPos * (MAX_LOOP_DURATION - MIN_LOOP_DURATION) + MIN_LOOP_DURATION);
       }
     }
     previousRMS = level;
@@ -228,7 +237,7 @@ void loop() {
   }
 
   // If duration expires but still signal, go into layering
-  if (recording && loopTimer > LOOP_DURATION_MS) {
+  if (recording && loopTimer > loopDuration) {
     Serial.println("Loop Time Reached: Start Layering");
     playingLoop = true;
     loopTimer = 0;
