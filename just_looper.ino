@@ -68,6 +68,7 @@ const int fadeDurationPin = A2;
 const int MAX_LOOP_DURATION = 3000;
 const in MIN_LOOP_DURATION = 500;
 const int MAX_LOOP_FADE_DURATION = 1500;
+const int MAX_LAYERS = 10;
 const int SAMPLE_RATE = 44100;
 const float BUFFER_PADDING = 1.25;
 const int BUFFER_SAMPLES = SAMPLE_RATE * (MAX_LOOP_DURATION + MAX_LOOP_FADE_DURATION * BUFFER_PADDING);
@@ -80,6 +81,7 @@ uint32_t writeIndex = 0;
 uint32_t readIndex = 0;
 uint32_t loopStart = 0;
 uint32_t loopEnd = 0;
+int curLayer = 0;
 
 bool fadeLooping = false;
 uint32_t fadeLoopStart = 0;
@@ -199,7 +201,7 @@ void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& c
   for (int i = 0; i < 128; i++) {
     out[i] = loopBuffer[curIndex++];
     if (curIndex >= BUFFER_SAMPLES) curIndex = 0;
-    if (curIndex >= end && (!needsToWrap || alreadyWrapped)) curIndex = start;
+    if (!recording && curIndex >= end && (!needsToWrap || alreadyWrapped)) curIndex = start;
   }
   queue.playBuffer();
 }
@@ -224,28 +226,29 @@ void loop() {
   handleFootswitch();
   //setLoopMix(loopMix);
 
-  // Detect signal to start recording
+  // Start on input detection
   if (inputAnalyzer.available()) {
     float level = inputAnalyzer.read();
     if (level > signalThreshold) {
       silenceTimer = 0;
+      curLayer = 0;
       if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
         //fadeDuration = (int)(fadeDurationPos * MAX_FADE_DURATION);
         //loopDuration = (int)(loopDurationPos * (MAX_LOOP_DURATION - MIN_LOOP_DURATION) + MIN_LOOP_DURATION);
         // writeIndex will be lost if recording has not been ocurring while playQueue has been playing loop
         // because of this, writeIndex will need to be recalculated far enough ahead of the readIndex
         // to allow the playQueue to finish fading out
-        if (!recording && playingLoop) {
-          writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLES;
+        if (playingLoop) {
           fadeLooping = true;
+          fadeLoopStart = loopStart;
+          fadeLoopEnd = loopEnd;
+          fadeLoopIdx = readIndex;
+          fadeLoopStartTime = millis(); 
+          curFadeDuration = fadeDuration;
         }
+        writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLES;
         loopStart = writeIndex;
         playingLoop = false;
-        fadeLoopStart = loopStart;
-        fadeLoopEnd = loopEnd;
-        fadeLoopIdx = loopStart;
-        fadeLoopStartTime = millis(); 
-        curFadeDuration = fadeDuration;
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
@@ -259,7 +262,18 @@ void loop() {
     previousRMS = level;
   }
 
-  // Write to buffer
+  // Stop on Silence
+  if (curLayer >= MAX_LAYERS || recording && silenceTimer > silenceTimeout) {
+    Serial.println("Silence Detected: Layering Complete");
+    curLayer = 0;
+    recording = false;
+    playingLoop = true;
+    loopEnd = (loopStart + SAMPLE_RATE * loopDuration) % BUFFER_SAMPLES;
+    inputFader.fadeOut(0); // mute input, ready for swell
+    recordQueue.end();
+  }
+
+  // Record
   if (recording && recordQueue.available()) {
     int16_t* buffer = recordQueue.readBuffer();
     if (!buffer) return;
@@ -273,30 +287,26 @@ void loop() {
     if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
   }
 
-  // End of layer if silence
-  if (recording && silenceTimer > silenceTimeout) {
-    Serial.println("Silence Detected: Layering Complete");
-    recording = false;
-    playingLoop = true;
-    loopEnd = (loopStart + SAMPLE_RATE * loopDuration) % BUFFER_SAMPLES;
-    inputFader.fadeOut(0); // mute input, ready for swell
-    recordQueue.end();
-  }
-
-  // If duration expires but still signal, go into layering
+  // Recording duration is met
   if (recording && loopTimer > loopDuration) {
     Serial.println("Loop Time Reached: Start Layering");
+    curLayer++;
+    if (!playingLoop) {
+      readIndex = loopStart;
+    }
     playingLoop = true;
     loopTimer = 0;
-    readIndex = loopStart; // may not be necessary since playQueue advances even when faded out
-    loopStart = writeIndex;
+    loopEnd = writeIndex;
     loopFader.fadeIn(0); // unmute loop in fader (starts loop output)
     recordMixer.gain(1, loopGainDecay); // unmute loop in mixer (starts overdub recording)
   }
 
+  // play loop
   if (playingLoop) {
     playLoop(playQueue, loopStart, loopEnd, readIndex);
   }
+
+  // play loop (using fader queue)
   if (fadeLooping) {
     if (millis() - fadeLoopStartTime >= curFadeDuration) {
       fadeLooping = false;
