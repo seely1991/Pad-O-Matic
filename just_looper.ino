@@ -122,7 +122,9 @@ void setup() {
   recordMixer.gain(0, 1.0f); // input to record
   recordMixer.gain(1, 0.0f); // mute loop for first record pass
   outputMixer.gain(0, 1.0f); // unmute true bypass (pedal starts in off position)
-  outputMixer.gain(1, 1.0f); // unmute outputMixer
+  outputMixer.gain(1, 0.0f); // mute eq input
+  outputMixer.gain(2, 1.0f); // unmute loop to record
+  outputMixer.gain(2, 1.0f); // unmute fader loop
 
   // Clear buffer on boot
   memset(loopBuffer, 0, sizeof(loopBuffer));
@@ -152,8 +154,10 @@ void handleFootswitch() {
     recording = false;
     playingLoop = false;
     inputFader.fadeIn(0); // make sure input is unmuted at fader
-    outputMixer.gain(0,1.0f); // unmute true bypass at output
-    outputMixer.gain(1,0.0f); // mute loop
+    trueBypass = true;
+    setBypass(true);
+    outputMixer.gain(2,0.0f); // mute loop
+    outputMixer.gain(3,0.0f); // mute loop fader
     memset(loopBuffer, 0, sizeof(loopBuffer));
     recordQueue.end();
     recordQueue.clear();
@@ -170,11 +174,15 @@ void handleFootswitch() {
   else if (tapCount == 1 && millis() - lastTapTime > tapWindow) {
     tapCount = 0;
     footswitchOn = !footswitchOn;
+    outputMixer.gain(2,1.0f); // unmute loop
+    outputMixer.gain(3,1.0f); // unmute loop fader
     if (footswitchOn) {
+      setBypass(false);
       inputFader.fadeOut(0); // mute input, ready for swell      waitingForSignal = true;
       recording = false;
       Serial.println("Entered Listening Mode: Waiting for input...");
     } else {
+      setBypass(true);
       playingLoop = true;
       recording = false;
       inputFader.fadeIn(0); // unmute input (in case muted)
@@ -194,6 +202,16 @@ void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& c
     if (curIndex >= end && (!needsToWrap || alreadyWrapped)) curIndex = start;
   }
   queue.playBuffer();
+}
+
+void setBypass(bool trueBypass) {
+  if (trueBypass) {
+    outputMixer.gain(0,1.0f); // mute true bypass at output
+    outputMixer.gain(1,0.0f);
+  } else {
+    outputMixer.gain(0,1.0f); // mute true bypass at output
+    outputMixer.gain(1,0.0f);
+  }
 }
 
 void loop() {
