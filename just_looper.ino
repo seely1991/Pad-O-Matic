@@ -192,8 +192,8 @@ void handleFootswitch() {
 }
 
 void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& curIndex, bool looping) {
-  const needsToWrap = start > end;
-  const alreadyWrapped = needsToWrap && curIndex < start;
+  const bool needsToWrap = start > end;
+  const bool alreadyWrapped = needsToWrap && curIndex < start;
   int16_t* out = queue.getBuffer();
   if (!out) return;
   for (int i = 0; i < 128; i++) {
