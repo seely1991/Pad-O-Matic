@@ -87,7 +87,7 @@ bool fadeLooping = false;
 uint32_t fadeLoopStart = 0;
 uint32_t fadeLoopEnd = 0;
 uint32_t fadeLoopIdx = 0;
-unsigned long fadeLoopStartTime = 0;
+uint32_t fadeLoopStartTime = 0;
 
 
 // STATE
@@ -106,13 +106,13 @@ int curFadeDuration = fadeDuration;
 float previousRMS = 0.0f;
 
 // DEBOUNCE + TAP
-const unsigned long tapWindow = 400;
-const unsigned long debounceDelay = 25;
+const uint32_t tapWindow = 400;
+const uint32_t debounceDelay = 25;
 bool lastFootswitchState = HIGH;
 bool debouncedState = HIGH;
-unsigned long lastDebounceTime = 0;
-unsigned long lastTapTime = 0;
-unsigned int tapCount = 0;
+uint32_t lastDebounceTime = 0;
+uint32_t lastTapTime = 0;
+uint32_t tapCount = 0;
 
 void setup() {
   pinMode(footswitchPin, INPUT_PULLUP);
@@ -139,7 +139,7 @@ void handleFootswitch() {
     if (reading != lastFootswitchState) {
       lastFootswitchState = reading;
       if (lastFootswitchState == LOW) {
-        unsigned long now = millis();
+        uint32_t now = millis();
         if (now - lastTapTime < tapWindow) tapCount++;
         else tapCount = 1;
         lastTapTime = now;
