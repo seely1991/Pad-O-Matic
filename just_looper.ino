@@ -34,26 +34,29 @@
 #include <SD.h>
 
 // GUItool: begin automatically generated code
-AudioInputI2S            i2s1;           //xy=94,381.3636169433594
-AudioEffectFade          inputFader;          //xy=269,317
-AudioAnalyzeRMS          inputAnalyzer;           //xy=273.54541015625,428.18182373046875
-AudioPlayQueue           playQueue;         //xy=469.6868591308594,432.46460723876953
-AudioEffectFade          loopFader;          //xy=650.3130760192871,361.7979431152344
-AudioMixer4              recordMixer;         //xy=821.8181686401367,514.4040832519531
-AudioMixer4              outputMixer;         //xy=851.1109352111816,320.8888511657715
-AudioRecordQueue         recordQueue;         //xy=996.4646606445312,514.6767616271973
-AudioOutputI2S           i2s2;           //xy=1042.898941040039,329.34347438812256
+AudioInputI2S            i2s1;           //xy=83,321
+AudioEffectFade          inputFader;     //xy=258,257
+AudioAnalyzeRMS          inputAnalyzer;  //xy=262,368
+AudioPlayQueue           playQueue;      //xy=325.5000057220459,304.50000381469727
+AudioPlayQueue           fadePlayQueue;         //xy=607.5000038146973,323.75000953674316
+AudioEffectFade          loopFader;      //xy=775.2500114440918,323.5000057220459
+AudioMixer4              recordMixer;    //xy=810,454
+AudioMixer4              outputMixer;    //xy=975.0000152587891,262.50000381469727
+AudioRecordQueue         recordQueue;    //xy=985,454
+AudioOutputI2S           i2s2;           //xy=1142.250015258789,271.50000381469727
 AudioConnection          patchCord1(i2s1, 0, inputAnalyzer, 0);
 AudioConnection          patchCord2(i2s1, 0, inputFader, 0);
 AudioConnection          patchCord3(inputFader, 0, recordMixer, 0);
 AudioConnection          patchCord4(inputFader, 0, outputMixer, 0);
 AudioConnection          patchCord5(inputFader, 0, outputMixer, 1);
-AudioConnection          patchCord6(playQueue, loopFader);
-AudioConnection          patchCord7(playQueue, 0, recordMixer, 1);
-AudioConnection          patchCord8(loopFader, 0, outputMixer, 2);
-AudioConnection          patchCord9(recordMixer, recordQueue);
-AudioConnection          patchCord10(outputMixer, 0, i2s2, 0);
+AudioConnection          patchCord6(playQueue, 0, recordMixer, 1);
+AudioConnection          patchCord7(playQueue, 0, outputMixer, 2);
+AudioConnection          patchCord8(fadePlayQueue, loopFader);
+AudioConnection          patchCord9(loopFader, 0, outputMixer, 3);
+AudioConnection          patchCord10(recordMixer, recordQueue);
+AudioConnection          patchCord11(outputMixer, 0, i2s2, 0);
 // GUItool: end automatically generated code
+
 
 
 
@@ -77,6 +80,14 @@ uint32_t writeIndex = 0;
 uint32_t readIndex = 0;
 uint32_t loopStart = 0;
 uint32_t loopEnd = 0;
+
+bool fadeLooping = false;
+uint32_t fadeLoopStart = 0;
+uint32_t fadeLoopEnd = 0;
+uint32_t fadeLoopIdx = 0;
+unsigned long fadeLoopStartTime = 0;
+int curFadeDuration = fadeDuration;
+
 
 // STATE
 bool waitingForSignal = true;
@@ -172,6 +183,19 @@ void handleFootswitch() {
   }
 }
 
+void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& curIndex) {
+  const needsToWrap = start > end;
+  const alreadyWrapped = needsToWrap && curIndex < start;
+  int16_t* out = queue.getBuffer();
+  if (!out) return;
+  for (int i = 0; i < 128; i++) {
+    out[i] = loopBuffer[curIndex++];
+    if (curIndex >= BUFFER_SAMPLES) curIndex = 0;
+    if (curIndex >= end && (!needsToWrap || alreadyWrapped)) curIndex = start;
+  }
+  queue.playBuffer();
+}
+
 void loop() {
 
 
@@ -194,9 +218,16 @@ void loop() {
         // because of this, writeIndex will need to be recalculated far enough ahead of the readIndex
         // to allow the playQueue to finish fading out
         if (!recording && playingLoop) {
-          writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLE;
+          writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLES;
         }
         loopStart = writeIndex;
+        playingLoop = false;
+        fadeLooping = true;
+        fadeLoopStart = loopStart;
+        fadeLoopEnd = loopEnd;
+        fadeLoopIdx = loopStart;
+        fadeLoopStartTime = millis(); 
+        curFadeDuration = fadeDuration;
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
@@ -250,19 +281,13 @@ void loop() {
   }
 
   if (playingLoop) {
-    int16_t* out = playQueue.getBuffer();
-    if (!out) return;
-    for (int i = 0; i < 128; i++) {
-      out[i] = loopBuffer[readIndex++];
-      if (readIndex >= BUFFER_SAMPLES) {
-        readIndex = 0;
-        readerNeedsToWrap = false;
-      }
-      if (!recording && !readerNeedsToWrap && readIndex >= loopEnd) {
-          readIndex = loopStart;
-        }
-      }
+    playLoop(playQueue, loopStart, loopEnd, readIndex);
+  }
+  if (fadeLooping) {
+    if (millis() - fadeLoopStartTime >= curFadeDuration) {
+      fadeLooping = false;
+    } else {
+      playLoop(fadePlayQueue, fadeLoopStart, fadeLoopEnd,fadeLoopIdx);
     }
-    playQueue.playBuffer();
   }
 }
