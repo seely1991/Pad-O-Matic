@@ -124,7 +124,7 @@ void setup() {
   outputMixer.gain(0, 1.0f); // unmute true bypass (pedal starts in off position)
   outputMixer.gain(1, 0.0f); // mute eq input
   outputMixer.gain(2, 1.0f); // unmute loop to record
-  outputMixer.gain(2, 1.0f); // unmute fader loop
+  outputMixer.gain(3, 1.0f); // unmute fader loop
 
   // Clear buffer on boot
   memset(loopBuffer, 0, sizeof(loopBuffer));
@@ -209,8 +209,8 @@ void setBypass(bool trueBypass) {
     outputMixer.gain(0,1.0f); // mute true bypass at output
     outputMixer.gain(1,0.0f);
   } else {
-    outputMixer.gain(0,1.0f); // mute true bypass at output
-    outputMixer.gain(1,0.0f);
+    outputMixer.gain(0,0.0f); // mute true bypass at output
+    outputMixer.gain(1,1.0f);
   }
 }
 
@@ -237,10 +237,10 @@ void loop() {
         // to allow the playQueue to finish fading out
         if (!recording && playingLoop) {
           writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLES;
+          fadeLooping = true;
         }
         loopStart = writeIndex;
         playingLoop = false;
-        fadeLooping = true;
         fadeLoopStart = loopStart;
         fadeLoopEnd = loopEnd;
         fadeLoopIdx = loopStart;
@@ -279,9 +279,6 @@ void loop() {
     recording = false;
     playingLoop = true;
     loopEnd = (loopStart + SAMPLE_RATE * loopDuration) % BUFFER_SAMPLES;
-    if (readerIndex > loopStart) {
-      readerNeedsToWrap = true;
-    }
     inputFader.fadeOut(0); // mute input, ready for swell
     recordQueue.end();
   }
@@ -295,7 +292,6 @@ void loop() {
     loopStart = writeIndex;
     loopFader.fadeIn(0); // unmute loop in fader (starts loop output)
     recordMixer.gain(1, loopGainDecay); // unmute loop in mixer (starts overdub recording)
-    readerCatchingUp = false;
   }
 
   if (playingLoop) {
