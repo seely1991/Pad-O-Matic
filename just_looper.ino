@@ -193,7 +193,7 @@ void handleFootswitch() {
   }
 }
 
-void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& curIndex) {
+void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& curIndex, bool looping) {
   const needsToWrap = start > end;
   const alreadyWrapped = needsToWrap && curIndex < start;
   int16_t* out = queue.getBuffer();
@@ -201,7 +201,7 @@ void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& c
   for (int i = 0; i < 128; i++) {
     out[i] = loopBuffer[curIndex++];
     if (curIndex >= BUFFER_SAMPLES) curIndex = 0;
-    if (!recording && curIndex >= end && (!needsToWrap || alreadyWrapped)) curIndex = start;
+    if (looping && curIndex >= end && (!needsToWrap || alreadyWrapped)) curIndex = start;
   }
   queue.playBuffer();
 }
@@ -303,7 +303,8 @@ void loop() {
 
   // play loop
   if (playingLoop) {
-    playLoop(playQueue, loopStart, loopEnd, readIndex);
+    bool isLooping = !recording;
+    playLoop(playQueue, loopStart, loopEnd, readIndex, isLooping);
   }
 
   // play loop (using fader queue)
@@ -311,7 +312,7 @@ void loop() {
     if (millis() - fadeLoopStartTime >= curFadeDuration) {
       fadeLooping = false;
     } else {
-      playLoop(fadePlayQueue, fadeLoopStart, fadeLoopEnd,fadeLoopIdx);
+      playLoop(fadePlayQueue, fadeLoopStart, fadeLoopEnd,fadeLoopIdx, true);
     }
   }
 }
