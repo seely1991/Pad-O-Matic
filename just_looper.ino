@@ -66,7 +66,7 @@ const int loopDurationPin = A1;
 const int fadeDurationPin = A2;
 // const int eqPin = A3;
 const int MAX_LOOP_DURATION = 3000;
-const in MIN_LOOP_DURATION = 500;
+const int MIN_LOOP_DURATION = 500;
 const int MAX_LOOP_FADE_DURATION = 1500;
 const int MAX_LAYERS = 10;
 const int SAMPLE_RATE = 44100;
@@ -88,7 +88,6 @@ uint32_t fadeLoopStart = 0;
 uint32_t fadeLoopEnd = 0;
 uint32_t fadeLoopIdx = 0;
 unsigned long fadeLoopStartTime = 0;
-int curFadeDuration = fadeDuration;
 
 
 // STATE
@@ -96,13 +95,13 @@ bool waitingForSignal = true;
 bool recording = false;
 bool playingLoop = false;
 bool footswitchOn = false;
-bool readerNeedsToWrap = false;
 
 elapsedMillis loopTimer;
 elapsedMillis silenceTimer;
 
 int loopDuration = MAX_LOOP_DURATION;
 int fadeDuration = MAX_FADE_DURATION;
+int curFadeDuration = fadeDuration;
 
 float previousRMS = 0.0f;
 
@@ -156,7 +155,6 @@ void handleFootswitch() {
     recording = false;
     playingLoop = false;
     inputFader.fadeIn(0); // make sure input is unmuted at fader
-    trueBypass = true;
     setBypass(true);
     outputMixer.gain(2,0.0f); // mute loop
     outputMixer.gain(3,0.0f); // mute loop fader
