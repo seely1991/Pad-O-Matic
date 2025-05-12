@@ -67,11 +67,11 @@ const int fadeDurationPin = A2;
 // const int eqPin = A3;
 const int MAX_LOOP_DURATION = 3000;
 const int MIN_LOOP_DURATION = 500;
-const int MAX_LOOP_FADE_DURATION = 1500;
+const int MAX_FADE_DURATION = 1500;
 const int MAX_LAYERS = 10;
 const int SAMPLE_RATE = 44100;
 const float BUFFER_PADDING = 1.25;
-const int BUFFER_SAMPLES = SAMPLE_RATE * (MAX_LOOP_DURATION + MAX_LOOP_FADE_DURATION * BUFFER_PADDING);
+const uint32_t BUFFER_SAMPLES = SAMPLE_RATE * (MAX_LOOP_DURATION + MAX_FADE_DURATION * BUFFER_PADDING);
 const float signalThreshold = 0.01;
 const int silenceTimeout = 750;
 const float loopGainDecay = 0.95;
@@ -166,7 +166,6 @@ void handleFootswitch() {
     writeIndex = 0;
     loopStart = 0;
     loopEnd = 0;
-    readerNeedsToWrap = false;
     Serial.println("Bypassed");
   }
 
