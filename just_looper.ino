@@ -81,7 +81,10 @@ uint32_t writeIndex = 0;
 uint32_t readIndex = 0;
 uint32_t loopStart = 0;
 uint32_t loopEnd = 0;
+
 int curLayer = 0;
+uint32_t timeOfMaxLayer = 0;
+bool maxLayerFading = false;
 
 bool fadeLooping = false;
 uint32_t fadeLoopStart = 0;
@@ -243,7 +246,7 @@ void loop() {
           fadeLoopStartTime = millis(); 
           curFadeDuration = fadeDuration;
         }
-        writeIndex = readIndex + (SAMPLE_RATE * fadeDuration * BUFFER_PADDING) % BUFFER_SAMPLES;
+        writeIndex = (readIndex + (uint32_t)(SAMPLE_RATE * fadeDuration * BUFFER_PADDING)) % BUFFER_SAMPLES;
         loopStart = writeIndex;
         playingLoop = false;
         recordQueue.begin();
@@ -260,14 +263,32 @@ void loop() {
   }
 
   // Stop on Silence
-  if (curLayer >= MAX_LAYERS || recording && silenceTimer > silenceTimeout) {
+  if (recording && silenceTimer > silenceTimeout) {
     Serial.println("Silence Detected: Layering Complete");
     curLayer = 0;
     recording = false;
     playingLoop = true;
-    loopEnd = (loopStart + SAMPLE_RATE * loopDuration) % BUFFER_SAMPLES;
+    loopEnd = writeIndex;
+    loopStart = (loopEnd - (SAMPLE_RATE * loopDuration)) + BUFFER_SAMPLES % BUFFER_SAMPLES;
     inputFader.fadeOut(0); // mute input, ready for swell
     recordQueue.end();
+  }
+
+  // fade out if max layers is reached (important for very short loop durations)
+  if (curLayer >= MAX_LAYERS) {
+    uint32_t curTime = millis();
+    if (curTime - timeOfMaxLayer >= fadeDuration) {
+      curLayer = 0;
+      recording = false;
+      playingLoop = true;
+      loopEnd = writeIndex;
+      loopStart = (loopEnd - (SAMPLE_RATE * loopDuration) + BUFFER_SAMPLES) % BUFFER_SAMPLES;
+      maxLayerFading = false;
+    } else if (!maxLayerFading) {
+      timeOfMaxLayer = curTime;
+      inputFader.fadeOut(fadeDuration);
+      maxLayerFading = true;
+    }
   }
 
   // Record
