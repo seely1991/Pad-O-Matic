@@ -297,12 +297,13 @@ void loop() {
   // Record
   if (recording && recordQueue.available()) {
     int16_t* buffer = recordQueue.readBuffer();
-    if (!buffer) return;
-    for (int i = 0; i < 128; i++) {
-      loopBuffer[writeIndex++] = buffer[i];
-      if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
+    if (buffer) {
+      for (int i = 0; i < 128; i++) {
+        loopBuffer[writeIndex++] = buffer[i];
+        if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
+      }
+      recordQueue.freeBuffer();
     }
-    recordQueue.freeBuffer();
   }
 
   // Recording duration is met
