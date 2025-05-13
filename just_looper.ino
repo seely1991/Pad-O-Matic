@@ -322,8 +322,8 @@ void loop() {
 
   // play loop
   if (playingLoop) {
-    bool isLooping = !recording;
-    playLoop(playQueue, loopStart, loopEnd, readIndex, isLooping);
+    bool shouldLoop = !recording;
+    playLoop(playQueue, loopStart, loopEnd, readIndex, shouldLoop);
   }
 
   // play loop (using fader queue)
@@ -331,7 +331,7 @@ void loop() {
     if (millis() - fadeLoopStartTime >= curFadeDuration) {
       fadeLooping = false;
     } else {
-      playLoop(fadePlayQueue, fadeLoopStart, fadeLoopEnd,fadeLoopIdx, true);
+      playLoop(fadePlayQueue, fadeLoopStart, fadeLoopEnd, fadeLoopIdx, true);
     }
   }
 }
