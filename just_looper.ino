@@ -253,6 +253,7 @@ void loop() {
         recordQueue.begin();
         Serial.println("Signal Detected: Swelling & Recording");
         recordMixer.gain(1, 0.0f); // mute loop for first pass
+        inputFader.fadeOut(0); // make sure input has a fade in from 0
         inputFader.fadeIn(fadeDuration);
         loopFader.fadeOut(fadeDuration);
         waitingForSignal = false;
