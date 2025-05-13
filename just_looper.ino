@@ -194,7 +194,7 @@ void handleFootswitch() {
   }
 }
 
-void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& curIndex, bool looping) {
+void playLoop(AudioPlayQueue& queue, uint32_t start, uint32_t end, uint32_t& curIndex, bool looping) {
   bool needsToWrap = start > end;
   bool alreadyWrapped = needsToWrap && curIndex < start;
   int16_t* out = queue.getBuffer();
