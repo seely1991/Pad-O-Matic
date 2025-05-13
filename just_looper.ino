@@ -194,8 +194,8 @@ void handleFootswitch() {
 }
 
 void playLoop(AudioPlayQueue& queue, uint32_t& start, uint32_t& end, uint32_t& curIndex, bool looping) {
-  const bool needsToWrap = start > end;
-  const bool alreadyWrapped = needsToWrap && curIndex < start;
+  bool needsToWrap = start > end;
+  bool alreadyWrapped = needsToWrap && curIndex < start;
   int16_t* out = queue.getBuffer();
   if (!out) return;
   for (int i = 0; i < 128; i++) {
@@ -269,7 +269,7 @@ void loop() {
     recording = false;
     playingLoop = true;
     loopEnd = writeIndex;
-    loopStart = (loopEnd - (SAMPLE_RATE * loopDuration)) + BUFFER_SAMPLES % BUFFER_SAMPLES;
+    loopStart = (loopEnd - (SAMPLE_RATE * loopDuration) + BUFFER_SAMPLES) % BUFFER_SAMPLES;
     inputFader.fadeOut(0); // mute input, ready for swell
     recordQueue.end();
   }
