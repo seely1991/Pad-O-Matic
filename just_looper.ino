@@ -281,6 +281,7 @@ void loop() {
     if (curTime - timeOfMaxLayer >= fadeDuration) {
       curLayer = 0;
       recording = false;
+      recordQueue.end();
       playingLoop = true;
       loopEnd = writeIndex;
       loopStart = (loopEnd - (SAMPLE_RATE * loopDuration) + BUFFER_SAMPLES) % BUFFER_SAMPLES;
