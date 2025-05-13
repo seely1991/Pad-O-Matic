@@ -232,7 +232,6 @@ void loop() {
     float level = inputAnalyzer.read();
     if (level > signalThreshold) {
       silenceTimer = 0;
-      curLayer = 0;
       if (waitingForSignal || (recording && level > previousRMS * 2.5f)) {
         //fadeDuration = (int)(fadeDurationPos * MAX_FADE_DURATION);
         //loopDuration = (int)(loopDurationPos * (MAX_LOOP_DURATION - MIN_LOOP_DURATION) + MIN_LOOP_DURATION);
@@ -247,6 +246,7 @@ void loop() {
           fadeLoopStartTime = millis(); 
           curFadeDuration = fadeDuration;
         }
+        curLayer = 0;
         writeIndex = (readIndex + (uint32_t)(SAMPLE_RATE * fadeDuration * BUFFER_PADDING)) % BUFFER_SAMPLES;
         loopStart = writeIndex;
         playingLoop = false;
