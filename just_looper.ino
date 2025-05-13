@@ -240,10 +240,10 @@ void loop() {
         // to allow the playQueue to finish fading out
         if (playingLoop) {
           fadeLooping = true;
-          fadeLoopStart = loopStart;
-          fadeLoopEnd = loopEnd;
+          fadeLoopEnd = writeIndex;
+          fadeLoopStart = (fadeLoopEnd - (SAMPLE_RATE * loopDuration) + BUFFER_SAMPLES) % BUFFER_SAMPLES;
           fadeLoopIdx = readIndex;
-          fadeLoopStartTime = millis(); 
+          fadeLoopStartTime = millis();
           curFadeDuration = fadeDuration;
         }
         curLayer = 0;
@@ -303,9 +303,6 @@ void loop() {
       if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
     }
     recordQueue.freeBuffer();
-  } else if (playingLoop) {
-    writeIndex++;
-    if (writeIndex >= BUFFER_SAMPLES) writeIndex = 0;
   }
 
   // Recording duration is met
