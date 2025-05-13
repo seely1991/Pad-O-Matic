@@ -180,7 +180,8 @@ void handleFootswitch() {
     outputMixer.gain(3,1.0f); // unmute loop fader
     if (footswitchOn) {
       setBypass(false);
-      inputFader.fadeOut(0); // mute input, ready for swell      waitingForSignal = true;
+      inputFader.fadeOut(0); // mute input, ready for swell      
+      waitingForSignal = true;
       recording = false;
       Serial.println("Entered Listening Mode: Waiting for input...");
     } else {
