@@ -29,9 +29,6 @@
 
 #include <Arduino.h>
 #include <Audio.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
 
 // GUItool: begin automatically generated code
 AudioInputI2S            i2s1;           //xy=83,321
@@ -56,8 +53,6 @@ AudioConnection          patchCord9(loopFader, 0, outputMixer, 3);
 AudioConnection          patchCord10(recordMixer, recordQueue);
 AudioConnection          patchCord11(outputMixer, 0, i2s2, 0);
 // GUItool: end automatically generated code
-
-
 
 
 const int footswitchPin = 0;
@@ -209,11 +204,11 @@ void playLoop(AudioPlayQueue& queue, uint32_t start, uint32_t end, uint32_t& cur
 
 void setBypass(bool trueBypass) {
   if (trueBypass) {
-    outputMixer.gain(0,1.0f); // mute true bypass at output
-    outputMixer.gain(1,0.0f);
+    outputMixer.gain(0,1.0f); // umute bypassed input at output
+    outputMixer.gain(1,0.0f); // mute eq'd input
   } else {
-    outputMixer.gain(0,0.0f); // mute true bypass at output
-    outputMixer.gain(1,1.0f);
+    outputMixer.gain(0,0.0f); // mute bypassed input at output
+    outputMixer.gain(1,1.0f); // unmute eq'd input
   }
 }
 
