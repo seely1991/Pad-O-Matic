@@ -31,15 +31,6 @@
 
 #include <Arduino.h>
 #include <Audio.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
-
-#include <Audio.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
-#include <SerialFlash.h>
 
 // GUItool: begin automatically generated code
 AudioInputI2S            i2s1;           //xy=83,321
@@ -208,7 +199,7 @@ void setBypass(bool trueBypass) {
     outputMixer.gain(0,1.0f); // mute true bypass at output
     outputMixer.gain(1,0.0f);
   } else {
-    outputMixer.gain(0,0.0f); // mute true bypass at output
+    outputMixer.gain(0,0.0f); // unmute true bypass at output
     outputMixer.gain(1,1.0f);
   }
 }
@@ -236,7 +227,7 @@ void loop() {
         // to allow the playQueue to finish fading out
         if (playingLoop) {
           loopEnd = writeIndex;
-          loopStart = (loopEnd - (uint32_t)(SAMPLE_RATE * loopDuration + BUFFER_SAMPLES)) % BUFFER_SAMPLES;
+          loopStart = (loopEnd - (SAMPLE_RATE * loopDuration) + BUFFER_SAMPLES) % BUFFER_SAMPLES;
           loopFader.fadeOut(fadeDuration);
         }
         inputFader.fadeOut(0); // make sure input has a fade in from 0
